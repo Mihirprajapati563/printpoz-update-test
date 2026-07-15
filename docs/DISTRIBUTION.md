@@ -194,26 +194,23 @@ The secrets are **still live in the `codnix-github` origin history** and on GitH
 
 ## 10. Known issues
 
-### macOS build fails — `Process completed with exit code 134` (SIGABRT)
-Seen on run #1 (`v0.1.2`). Windows + Linux succeed (`fail-fast: false`). Most likely cause: the `mac` config sets `hardenedRuntime: true` + `entitlements`, but there's **no signing identity** in CI. On Apple-Silicon runners electron-builder attempts to codesign (arm64 binaries must be signed to run) and aborts when hardened-runtime signing has no cert.
+### macOS build failed — exit 134 = React build ran OUT OF MEMORY (not signing!)
+The exit 134 (SIGABRT) on the mac runner was a **JavaScript heap OOM** in the CRA production build, NOT a codesign problem:
+```
+FATAL ERROR: Reached heap limit Allocation failed - JavaScript heap out of memory
+sh: line 1: 1844 Abort trap: 6   npm run build
+```
+The build peaked at Node's ~2 GB default old-space heap and aborted. Windows/Linux runners had enough RAM to squeak by; the Apple-Silicon mac runner (less RAM) didn't. `identity: null` was a red herring — the DMG/codesign step is never reached.
 
-**Status:** `identity: null` applied (hardenedRuntime + entitlements commented out) but **exit 134 persists** on run #3 — so the abort is NOT (only) the signing step. Next debug step: open the red mac job in Actions, expand steps, find WHICH step exits 134 (likely the `dmg` packaging via `hdiutil`/`dmg-builder` on the arm64 runner). Fallback: option B (drop mac from the matrix — recommended given no Apple account). Original options:
+**Fix (applied):** set `NODE_OPTIONS: --max-old-space-size=4096` on the build step in `release.yml`. Raise to 6144 if it ever recurs. (`identity: null` is kept — it's still the correct setting for an unsigned mac build, just wasn't the cause here.)
 
-- **(A) Produce an unsigned DMG anyway** (enables the mac notify-banner flow): tell electron-builder to skip signing —
-  ```yaml
-  mac:
-    identity: null          # explicitly no signing
-    # (optionally drop hardenedRuntime + entitlements while unsigned)
-  ```
-- **(B) Drop macOS from CI until you have an Apple cert** (recommended given no Apple account — unsigned mac can't auto-update anyway). In `release.yml`:
-  ```yaml
-  matrix:
-    os: [windows-latest, ubuntu-latest]   # add macos-latest back when signing is ready
-  ```
-  The mac update code (`initMacNotifyOnly` + banner) stays in the source; it's just not built by CI.
+### Auto-update "never downloaded anything" — releases were DRAFTS
+The installed app's badge showed **"Update check failed"** and nothing ever downloaded. Root cause: **electron-builder publishes GitHub releases as `draft` by default**, and **electron-updater cannot read draft releases** (their assets aren't publicly served → `latest.yml` 404s → check errors → no download). This is the #1 silent-auto-update gotcha.
+
+**Fix (applied):** `releaseType: release` under `publish:` in `electron-builder.yml` — releases publish immediately so the feed is live. **Also delete the old draft releases** (0.1.2–0.1.4) from the Releases page so they don't linger.
 
 ### Node 20 deprecation warning
-`actions/checkout@v4` / `actions/setup-node@v4` "target Node 20 but forced to run on Node 24." **Harmless warning**, not the failure. The actions still work. Bump to newer action majors when convenient.
+`actions/checkout@v4` / `actions/setup-node@v4` "target Node 20 but forced to run on Node 24." **Harmless warning, NOT an error** — GitHub auto-runs the actions on Node 24 and they work fine. No fix needed; newer action majors will target Node 24 eventually.
 
 ---
 

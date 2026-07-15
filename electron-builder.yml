@@ -60,3 +60,7 @@ publish:
   provider: github
   owner: Mihirprajapati563
   repo: printpoz-update-test
+  # electron-builder defaults releaseType to "draft" — but electron-updater CANNOT
+  # read draft releases (assets aren't public), so the update check 404s and nothing
+  # downloads. "release" publishes immediately so the feed is live.
+  releaseType: release

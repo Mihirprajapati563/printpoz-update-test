@@ -36,6 +36,9 @@ jobs:
         run: npm run electron:build && npx electron-builder --publish always
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # The React (CRA) production build OOMs at the ~2GB default heap on the
+          # macOS runner (Abort trap 6 / exit 134). Raise the limit for all OSes.
+          NODE_OPTIONS: --max-old-space-size=4096
           # --- Code signing (leave unset for unsigned builds) ---
           # Windows: base64 .pfx + password
           # CSC_LINK: ${{ secrets.WIN_CSC_LINK }}
