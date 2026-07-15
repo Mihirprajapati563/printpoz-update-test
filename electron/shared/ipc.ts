@@ -443,5 +443,5 @@ export interface DesktopApi {
   imageCache: ImageCacheApi;
   themePacks: ThemePacksApi;
   onMenu(cb: (event: MenuEvent) => void): () => void;
-  onUpdateStatus(cb: (status: UpdateStatus) => void): () => void;
+  onUpdateStatus(cb: (status: UpdateStatus, progress?: number) => void): () => void;
 }

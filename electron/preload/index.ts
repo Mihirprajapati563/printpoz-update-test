@@ -129,8 +129,8 @@ const api: DesktopApi = {
     ipcRenderer.on(CHANNELS.menuEvent, listener);
     return () => ipcRenderer.removeListener(CHANNELS.menuEvent, listener);
   },
-  onUpdateStatus: (cb: (status: UpdateStatus) => void) => {
-    const listener = (_: unknown, status: UpdateStatus) => cb(status);
+  onUpdateStatus: (cb: (status: UpdateStatus, progress?: number) => void) => {
+    const listener = (_: unknown, status: UpdateStatus, progress?: number) => cb(status, progress);
     ipcRenderer.on(CHANNELS.updateStatus, listener);
     return () => ipcRenderer.removeListener(CHANNELS.updateStatus, listener);
   },

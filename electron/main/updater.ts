@@ -27,9 +27,9 @@ const CHECK_INTERVAL_MS = 6 * 60 * 60 * 1000;
 // (the status is a fire-and-forget push; a missed one only reappears next interval).
 const MAC_FIRST_CHECK_DELAY_MS = 15 * 1000;
 
-function sendStatus(status: UpdateStatus): void {
+function sendStatus(status: UpdateStatus, progress?: number): void {
   for (const w of BrowserWindow.getAllWindows()) {
-    if (!w.isDestroyed()) w.webContents.send(CHANNELS.updateStatus, status);
+    if (!w.isDestroyed()) w.webContents.send(CHANNELS.updateStatus, status, progress);
   }
 }
 
@@ -59,10 +59,25 @@ function initSilentAutoUpdater(): void {
   autoUpdater.autoDownload = true;
   autoUpdater.autoInstallOnAppQuit = true;
   autoUpdater.logger = logger as unknown as import("electron-updater").Logger;
-  autoUpdater.on("error", (e) => logger.error("autoUpdater error", { err: String(e) }));
-  autoUpdater.on("update-available", (i) => logger.info("update-available", { version: i.version }));
-  autoUpdater.on("update-not-available", () => logger.info("update-not-available"));
-  autoUpdater.on("update-downloaded", (i) => logger.info("update-downloaded", { version: i.version }));
+  // Mirror every stage to the renderer so the in-app badge can show it live.
+  autoUpdater.on("checking-for-update", () => sendStatus("checking"));
+  autoUpdater.on("error", (e) => {
+    logger.error("autoUpdater error", { err: String(e) });
+    sendStatus("error");
+  });
+  autoUpdater.on("update-available", (i) => {
+    logger.info("update-available", { version: i.version });
+    sendStatus("available");
+  });
+  autoUpdater.on("update-not-available", () => {
+    logger.info("update-not-available");
+    sendStatus("not-available");
+  });
+  autoUpdater.on("download-progress", (p) => sendStatus("downloading", Math.round(p.percent)));
+  autoUpdater.on("update-downloaded", (i) => {
+    logger.info("update-downloaded", { version: i.version });
+    sendStatus("downloaded");
+  });
 
   const check = () =>
     autoUpdater.checkForUpdates().catch((err) => {
