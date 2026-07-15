@@ -34,12 +34,17 @@ mac:
   target:
     - dmg
   category: public.app-category.graphics-design
-  hardenedRuntime: true
-  entitlements: build-resources/entitlements.mac.plist
-  entitlementsInherit: build-resources/entitlements.mac.plist
-  # Notarization runs automatically when CSC_LINK + CSC_KEY_PASSWORD (Developer ID
-  # cert) and APPLE_ID + APPLE_APP_SPECIFIC_PASSWORD + APPLE_TEAM_ID env vars are
-  # set in CI. Without them the build is unsigned and CANNOT auto-update on macOS.
+  # UNSIGNED build (no Apple Developer cert yet). `identity: null` tells
+  # electron-builder to skip codesigning — without it, hardened-runtime signing
+  # aborts on Apple-Silicon CI runners (exit code 134). hardenedRuntime +
+  # entitlements are only meaningful WITH a signing identity, so they're disabled
+  # while unsigned. When you get a Developer ID cert: remove `identity: null`,
+  # re-enable the three lines below, set notarize:true, and add the CSC_/APPLE_ env
+  # vars in CI (notarization then runs automatically).
+  identity: null
+  # hardenedRuntime: true
+  # entitlements: build-resources/entitlements.mac.plist
+  # entitlementsInherit: build-resources/entitlements.mac.plist
   notarize: false
 
 linux:
