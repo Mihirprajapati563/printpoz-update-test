@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Resize Imperative Performance — Session Notes (2026-06-16)</title>
+<style>
+  :root {
+    --bg:#0f1115; --panel:#171a21; --text:#e6e8ec; --muted:#9aa3b2;
+    --accent:#5b9dff; --accent2:#54d6a0; --border:#262b35; --warn:#ffb454; --code:#0b0d11;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);
+    font:16px/1.65 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}
+  .wrap{max-width:960px;margin:0 auto;padding:48px 24px 96px}
+  h1{font-size:30px;line-height:1.2;margin:0 0 6px}
+  h2{font-size:22px;margin:44px 0 14px;padding-top:14px;border-top:1px solid var(--border)}
+  h3{font-size:18px;margin:26px 0 8px;color:var(--accent)}
+  .sub{color:var(--muted);margin:0 0 28px}
+  blockquote{margin:0 0 24px;padding:12px 18px;background:var(--panel);
+    border-left:3px solid var(--accent);border-radius:6px;color:var(--muted)}
+  code{background:var(--code);padding:2px 6px;border-radius:4px;font-size:.88em;
+    font-family:"SF Mono",ui-monospace,Menlo,Consolas,monospace;color:#d7e2ff}
+  a{color:var(--accent);text-decoration:none;border-bottom:1px solid rgba(91,157,255,.4)}
+  a:hover{border-bottom-color:var(--accent)}
+  .docnav{display:flex;gap:12px;flex-wrap:wrap;margin:0 0 24px}
+  .docnav a{display:inline-flex;align-items:center;gap:8px;padding:10px 16px;border:1px solid var(--border);
+    border-radius:10px;background:var(--panel);font-weight:600;border-bottom:1px solid var(--border)}
+  .docnav a:hover{border-color:var(--accent)}
+  .docnav a.here{border-color:var(--accent2);color:var(--accent2);cursor:default}
+  pre{background:var(--code);border:1px solid var(--border);border-radius:10px;
+    padding:16px 18px;overflow:auto;font-family:"SF Mono",ui-monospace,Menlo,Consolas,monospace;
+    font-size:13px;line-height:1.5;color:#cdd6e6}
+  table{width:100%;border-collapse:collapse;margin:14px 0 24px;font-size:15px}
+  th,td{text-align:left;padding:9px 12px;border:1px solid var(--border);vertical-align:top}
+  th{background:#1d2230}
+  td:first-child{color:var(--accent2)}
+  ul{padding-left:22px}
+  .ok{color:var(--accent2)} .warn{color:var(--warn)}
+  .pill{display:inline-block;font-size:12px;padding:2px 9px;border-radius:20px;
+    background:#1d2230;color:var(--accent2);border:1px solid var(--border);margin-left:8px}
+  footer{margin-top:56px;color:var(--muted);font-size:13px;border-top:1px solid var(--border);padding-top:16px}
+  /* ── visual diagrams ── */
+  .diagram{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:22px;margin:18px 0}
+  .diagram .dtitle{font-weight:700;color:var(--accent);margin-bottom:4px;font-size:16px}
+  .diagram .plain{color:var(--muted);font-size:14px;margin:0 0 16px}
+  .dgrow{display:flex;align-items:center;gap:10px;flex-wrap:wrap;justify-content:center}
+  .dgbox{border:2px solid var(--border);border-radius:10px;background:#11151c;padding:10px 14px;text-align:center;min-width:96px}
+  .dgbox .big{font-weight:700;font-size:15px;color:var(--text)}
+  .dgbox .smol{font-size:12px;color:var(--muted);margin-top:4px;line-height:1.4}
+  .dgbox.accent{border-color:var(--accent)} .dgbox.green{border-color:var(--accent2)} .dgbox.warn{border-color:var(--warn)} .dgbox.bad{border-color:#c0504d}
+  .arrow{color:var(--accent);font-size:26px;font-weight:700;line-height:1}
+  .vs{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  .vs .card{border:2px solid var(--border);border-radius:10px;padding:14px;background:#11151c}
+  .vs .card.bad{border-color:#c0504d} .vs .card.good{border-color:var(--accent2)}
+  .vs h4{margin:0 0 10px;font-size:14px}
+  .vs .smol{font-size:13px;color:var(--muted);line-height:1.5}
+  @media (max-width:640px){.vs{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <h1>Resize Imperative Performance</h1>
+  <p class="sub">Session notes — 2026-06-16 · smooth single-object resize at 60fps for <strong>every</strong> object type (image, text, shape, sticker, QR, calendar), without breaking undo, the footer live preview, or save/export.</p>
+
+  <nav class="docnav">
+    <a href="architecture.md">🏛️ Architecture →</a>
+    <a href="codebase-analysis.md">🔍 Codebase Analysis →</a>
+    <a href="data-flow-diagram.md">🔀 Data Flow Diagram →</a>
+    <a href="canvas.md">🖌️ Canvas →</a>
+    <a href="interaction.md">✋ Interaction →</a>
+    <a href="photo.md">📷 Photo →</a>
+    <a href="shape.md">🔷 Shape →</a>
+    <a href="sticker.md">⭐ Sticker →</a>
+    <a href="text.md">🔤 Text →</a>
+    <a href="react-native-migration-plan.md">📱 React Native Migration Plan →</a>
+    <a href="upload-pipeline.md">⬆️ Upload Pipeline →</a>
+    <a href="session-2026-06-12-upload-pipeline-rework.md">📝 Session: Upload Pipeline Rework (2026-06-12) →</a>
+    <a href="image-loading-optimization-2026-06-16.html">🖼️ Image Loading Optimization (2026-06-16) →</a>
+    <a href="canvas-interaction-performance-2026-06-16.html">🎯 Canvas Interaction Performance (2026-06-16) →</a>
+    <a class="here">📐 Resize Imperative Performance (2026-06-16) — you are here</a>
+    <a href="photobook-full-cover-sync-2026-06-19.html">🅿️ Photobook Full Cover Sync (2026-06-19) →</a>
+    <a href="photos-gallery-order-and-preview-2026-06-19.html">🗂️ Photos Gallery Order &amp; Preview (2026-06-19) →</a>
+    <a href="customer-autosave-activity-gate-2026-06-19.html">💾 Customer Auto-Save Activity Gate (2026-06-19) →</a>
+    <a href="canvas-rulers-2026-06-24.html">📏 Canvas Rulers (2026-06-24) →</a>
+  </nav>
+  <blockquote>Companion to <a href="canvas-interaction-performance-2026-06-16.html">Canvas Interaction Performance</a>, which made drag/rotate/inner-zoom/pan imperative. Resize was explicitly <em>deferred</em> there; this doc finishes it for all object types.</blockquote>
+
+  <h2>TL;DR</h2>
+  <table>
+    <tr><th>Problem</th><th>Fix</th></tr>
+    <tr><td>Resize dispatched to Redux <strong>every frame</strong> → the ~3900-line <code>MainCanvas</code> re-rendered synchronously (<code>flushSync</code>) each frame = the lag</td><td>During the gesture, push live geometry to a <strong>per-object store</strong>; only the resized object re-renders, <code>MainCanvas</code> does <strong>not</strong>. Commit to Redux <strong>once</strong> on release.</td></tr>
+    <tr><td>First attempt (rAF-coalesce the dispatch) made it <span class="warn">worse</span></td><td>Coalescing punted the dispatch off Moveable's synchronous <code>flushSync</code> tick → content lagged the box. Reverted. The cost was never the dispatch <em>count</em>.</td></tr>
+    <tr><td>Text has self-managing height effects (auto-grow, Firefox fix) that <strong>dispatch</strong></td><td>Guard those two effects OFF while resizing (<code>isLiveResizing</code>); they re-validate once the resize commits.</td></tr>
+    <tr><td>Footer thumbnails read Redux → would freeze during the dispatch-free gesture</td><td>Footer <strong>preview</strong> renderers subscribe to the same store (size) + wrapper translate is mirrored (position).</td></tr>
+  </table>
+
+  <h2>How it works — at a glance 🎯</h2>
+
+  <div class="diagram">
+    <div class="dtitle">Resizing ONE object used to re-render the whole canvas's React tree</div>
+    <p class="plain">Drag was already smooth — it commits to Redux <strong>zero</strong> times mid-gesture. Resize kept dispatching every frame, and every dispatch re-ran the giant <code>MainCanvas</code> component.</p>
+    <div class="vs">
+      <div class="card bad">
+        <h4>❌ Before (per resize frame)</h4>
+        <div class="smol"><code>onResize → dispatch(redux)</code><br>└─ MainCanvas re-render (3900-line reconcile)<br>…a commit (+ undo churn) <strong>every frame</strong></div>
+      </div>
+      <div class="card good">
+        <h4>✅ After (per resize frame)</h4>
+        <div class="smol"><code>onResize → store.setLiveResize(id)</code><br>└─ only THAT object re-renders<br>…<code>MainCanvas</code> untouched · commit <strong>once</strong> on release</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="diagram">
+    <div class="dtitle">Why a store, not imperative DOM?</div>
+    <p class="plain">We want <strong>true reflow</strong> (text re-wraps, image re-crops, calendar grid re-lays-out) — not a uniform <code>scale()</code>. Letting React render the object with the live geometry gives correct reflow for free, for every type, with no per-type DOM surgery.</p>
+    <div class="dgrow">
+      <div class="dgbox accent"><div class="big">ItemDragger</div><div class="smol">onResize (no redux)</div></div>
+      <span class="arrow">→</span>
+      <div class="dgbox"><div class="big">liveResizeStore</div><div class="smol">Map&lt;id, geometry&gt;<br>useSyncExternalStore</div></div>
+      <span class="arrow">→</span>
+      <div class="dgbox green"><div class="big">that 1 object</div><div class="smol">canvas + footer copy<br>re-render &amp; reflow</div></div>
+    </div>
+    <p class="plain" style="margin-top:14px;text-align:center"><code>MainCanvas</code> never subscribes to the store → it never re-renders during the gesture.</p>
+  </div>
+
+  <h2>1. The diagnosis (measured, not guessed)</h2>
+  <p>The lag was localized by elimination — each observation ruled a hypothesis out:</p>
+  <table>
+    <tr><th>Observation</th><th>Rules out</th></tr>
+    <tr><td>"Highlight updates": <strong>only the resized object</strong> flashes</td><td>React render fan-out (memo works)</td></tr>
+    <tr><td><strong>Shape lags like image</strong> (shape dispatches once/frame, image up to 3×)</td><td>Dispatch <em>count</em></td></tr>
+    <tr><td>Same lag with <strong>2 objects or 30</strong></td><td>Object-count-scaled work</td></tr>
+    <tr><td><strong>Type-independent</strong> (text/shape/image equal)</td><td>Image-specific raster</td></tr>
+    <tr><td><strong>Paint flashing</strong> shows almost no green</td><td>SVG repaint</td></tr>
+    <tr><td>Disabling Moveable <strong>snapping</strong> changed nothing</td><td>Moveable re-measure / snap</td></tr>
+  </table>
+  <p>What remains is a <strong>fixed per-dispatch cost</strong> invisible to paint/highlight = the synchronous <code>MainCanvas</code> reconciliation forced by <code>flushSync</code> on every per-frame dispatch. Confirmed: <strong>drag (0 dispatches) is smooth</strong>; resize (per-frame dispatch) is not.</p>
+
+  <h2>2. The mechanism</h2>
+  <h3>2.1 Per-object override store</h3>
+  <p>A module-level <code>Map&lt;id, override&gt;</code> + <code>useSyncExternalStore</code>. <code>setLiveResize(id, {width,height,image?})</code> notifies only that id's subscribers; <code>getLiveResize</code> returns a cached ref (or <code>null</code>) so there's no idle re-render and no <code>getSnapshot</code> thrash.</p>
+  <h3>2.2 Renderers merge the override</h3>
+  <pre>const liveResize = useLiveResize(rawItem.id);
+const item = liveResize ? { ...rawItem, ...liveResize } : rawItem;</pre>
+  <p><code>null</code> at all other times → a complete no-op outside an active resize. During a resize, only the one object's component re-renders (canvas + footer copy) and React reflows the real geometry.</p>
+  <h3>2.3 ItemDragger drives it imperatively</h3>
+  <ul>
+    <li><strong>onResizeStart</strong> — seed <code>resizeWorkingRef</code> from the live object (the image-cover math chains off it, reproducing the old <code>flushSync</code> chain since Redux is frozen during the gesture).</li>
+    <li><strong>onResize</strong> — compute next geometry (image cover / text measure+clamp / plain size) and <code>setLiveResize(id, …)</code>. <strong>No Redux dispatch.</strong></li>
+    <li><strong>onRender</strong> — wrapper translate via <code>cssText</code> (canvas) + mirrored to footer (<code>applyLiveObjectTransform</code>); skips the per-frame dispatch for imperative types.</li>
+    <li><strong>onResizeEnd</strong> — one <code>history:true</code> commit of width/height/image (+ x/y if a top/left handle moved the wrapper), then clear the override. Committed value == last override → no jump.</li>
+  </ul>
+  <h3>2.4 Text's self-managing effects are guarded</h3>
+  <p>Canvas <code>Text</code> has a font auto-grow effect and a Firefox height-fix effect that <strong>dispatch height</strong> and are keyed on <code>item.width/height</code>. They early-return while <code>isLiveResizing</code> and re-run once the resize commits ("can't shrink below content" is also kept live via a measure+clamp in <code>onResize</code>).</p>
+
+  <h2>3. Coverage — ALL single-object types</h2>
+  <table>
+    <tr><th>Type</th><th>Canvas renderer</th><th>Footer renderer</th><th>Imperative</th></tr>
+    <tr><td>Image</td><td><code>canvas/Photo</code></td><td><code>preview/Photo</code></td><td><span class="ok">✅</span></td></tr>
+    <tr><td>Text</td><td><code>canvas/Text</code> (+effect guards)</td><td><code>preview/Text</code></td><td><span class="ok">✅</span></td></tr>
+    <tr><td>Shape</td><td><code>canvas/Shape</code></td><td><code>preview/Shape</code></td><td><span class="ok">✅</span></td></tr>
+    <tr><td>Sticker</td><td><code>canvas/Sticker</code></td><td><code>preview/Sticker</code></td><td><span class="ok">✅</span></td></tr>
+    <tr><td>QR code</td><td><code>canvas/QRCode</code></td><td><code>preview/QRCode</code></td><td><span class="ok">✅</span></td></tr>
+    <tr><td>Calendar</td><td><code>calendar/DynamicCalendar</code></td><td><code>preview/DynamicCalendar</code></td><td><span class="ok">✅</span></td></tr>
+    <tr><td>Multi-calendar</td><td colspan="2"><code>calendar/MultipleDynamicCalendar</code> (shared by canvas + footer)</td><td><span class="ok">✅</span></td></tr>
+  </table>
+  <p><strong>Not in scope</strong> (unchanged, no regression): multi-select <strong>group</strong> resize (group Moveable / <code>onResizeGroup</code>). Single-object drag/rotate/inner-zoom/pan were already imperative (companion doc).</p>
+
+  <h2>4. Files changed</h2>
+  <table>
+    <tr><th>File</th><th>Change</th></tr>
+    <tr><td>components/canvas/liveResizeStore.js</td><td><strong>New</strong> — per-object override store + <code>useLiveResize</code></td></tr>
+    <tr><td>components/canvas/ItemDragger.jsx</td><td>Imperative resize for all 7 types; commit once on end; footer translate mirror; <code>onRender</code> skips per-frame dispatch for imperative types</td></tr>
+    <tr><td>canvas/Photo · Shape · Sticker · QRCode</td><td>Merge live override</td></tr>
+    <tr><td>canvas/Text</td><td>Merge override <strong>+ guard the 2 geometry-keyed dispatching effects</strong></td></tr>
+    <tr><td>calendar/DynamicCalendar · MultipleDynamicCalendar</td><td>Merge override; re-derive width/height from it</td></tr>
+    <tr><td>preview/Photo · Text · Shape · Sticker · QRCode · DynamicCalendar</td><td>Merge override → footer tracks the resize live</td></tr>
+  </table>
+
+  <h2>5. Safety audit (verified by reading the code)</h2>
+  <ul>
+    <li><strong>Undo/redo</strong> — zero history during the gesture; exactly <strong>one</strong> <code>history:true</code> commit on release. One Ctrl+Z restores fully.</li>
+    <li><strong>Image crop/cover</strong> — math ported verbatim, chained through the working ref → same result as the old <code>flushSync</code> chain (no drift).</li>
+    <li><strong>Rotated objects</strong> — rotation is <strong>not</strong> taken from the gesture (which can report 0 during resize); the pre-resize angle is preserved on commit and in the footer mirror.</li>
+    <li><strong>Text "can't shrink below content"</strong> — preserved (live measure+clamp; guarded effect re-validates on commit).</li>
+    <li><strong>Save / export / order / themes</strong> — all read Redux (committed value); no <code>blob:</code>/URL handling, so nothing can leak.</li>
+    <li><strong>Locked / customer-disabled</strong> — resize gated by <code>isAdjustable</code>; untouched.</li>
+    <li><strong>Idle cost</strong> — <code>useLiveResize</code> returns <code>null</code> when not resizing → no extra re-renders, ever.</li>
+    <li><strong>Calendar / QR / Shape / Sticker</strong> — pure renderers (no dispatch), so wiring cannot re-introduce the lag or fight the override.</li>
+  </ul>
+
+  <h2>6. Gotchas (do not regress)</h2>
+  <ul>
+    <li><strong>Never coalesce the resize dispatch onto rAF</strong> — it desyncs from Moveable's <code>flushSync</code> selection box. The fix is <em>no</em> per-frame dispatch, not <em>fewer</em>.</li>
+    <li><strong>Text's dispatching effects MUST stay guarded</strong> (<code>isLiveResizing</code>) — without it they dispatch height per frame, re-introducing the lag.</li>
+    <li><strong><code>MainCanvas</code> must NOT subscribe to the store</strong> — the store is consumed only by leaf renderers.</li>
+    <li><strong>Commit on release must equal the last override</strong> (read from <code>resizeWorkingRef</code>) — else the object jumps on release.</li>
+    <li><strong>Calendar width/height</strong> are default-from-item params; re-derive them from the merged item or the override won't take effect.</li>
+  </ul>
+
+  <h2>7. Verification checklist</h2>
+  <ul>
+    <li>"Highlight updates": resizing any object highlights <strong>only that object</strong>.</li>
+    <li>Profiler: <code>MainCanvas</code> shows <strong>0 commits during a resize, 1 on release</strong>.</li>
+    <li>Smooth at 4× CPU throttle for image, text, shape, sticker, QR, calendar.</li>
+    <li>Footer thumbnail tracks <strong>live</strong> (size + position) for every type.</li>
+    <li>Top-left-corner resize and rotated-object resize both track on canvas + footer.</li>
+    <li>Ctrl+Z after a resize = one clean undo, every type.</li>
+    <li>Text still cannot shrink below content; auto-grow works after release.</li>
+    <li>Save/export reflect the final committed size.</li>
+  </ul>
+
+  <footer>Photo-Editors · canvas resize performance · 2026-06-16</footer>
+
+</div>
+</body>
+</html>

@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Blank Theme — Random-Layout Generator (2026-07-08)</title>
+<style>
+  :root {
+    --bg:#0f1115; --panel:#171a21; --text:#e6e8ec; --muted:#9aa3b2;
+    --accent:#5b9dff; --accent2:#54d6a0; --border:#262b35; --warn:#ffb454; --code:#0b0d11;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);
+    font:16px/1.65 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}
+  .wrap{max-width:960px;margin:0 auto;padding:48px 24px 96px}
+  h1{font-size:30px;line-height:1.2;margin:0 0 6px}
+  h2{font-size:22px;margin:44px 0 14px;padding-top:14px;border-top:1px solid var(--border)}
+  h3{font-size:18px;margin:26px 0 8px;color:var(--accent)}
+  .sub{color:var(--muted);margin:0 0 28px}
+  blockquote{margin:0 0 24px;padding:12px 18px;background:var(--panel);
+    border-left:3px solid var(--accent);border-radius:6px;color:var(--muted)}
+  code{background:var(--code);padding:2px 6px;border-radius:4px;font-size:.88em;
+    font-family:"SF Mono",ui-monospace,Menlo,Consolas,monospace;color:#d7e2ff}
+  a{color:var(--accent);text-decoration:none;border-bottom:1px solid rgba(91,157,255,.4)}
+  a:hover{border-bottom-color:var(--accent)}
+  .docnav{display:flex;gap:12px;flex-wrap:wrap;margin:0 0 24px}
+  .docnav a{display:inline-flex;align-items:center;gap:8px;padding:10px 16px;border:1px solid var(--border);
+    border-radius:10px;background:var(--panel);font-weight:600;border-bottom:1px solid var(--border)}
+  .docnav a:hover{border-color:var(--accent)}
+  .docnav a.here{border-color:var(--accent2);color:var(--accent2);cursor:default}
+  pre{background:var(--code);border:1px solid var(--border);border-radius:10px;
+    padding:16px 18px;overflow:auto;font-family:"SF Mono",ui-monospace,Menlo,Consolas,monospace;
+    font-size:13px;line-height:1.5;color:#cdd6e6}
+  table{width:100%;border-collapse:collapse;margin:14px 0 24px;font-size:15px}
+  th,td{text-align:left;padding:9px 12px;border:1px solid var(--border);vertical-align:top}
+  th{background:#1d2230}
+  td:first-child{color:var(--accent2)}
+  ul,ol{padding-left:22px}
+  .ok{color:var(--accent2)} .warn{color:var(--warn)} .no{color:#e06c6c}
+  .pill{display:inline-block;font-size:12px;padding:2px 9px;border-radius:20px;
+    background:#1d2230;color:var(--accent2);border:1px solid var(--border);margin-left:8px}
+  footer{margin-top:56px;color:var(--muted);font-size:13px;border-top:1px solid var(--border);padding-top:16px}
+  .diagram{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:22px;margin:18px 0}
+  .diagram .dtitle{font-weight:700;color:var(--accent);margin-bottom:4px;font-size:16px}
+  .diagram .plain{color:var(--muted);font-size:14px;margin:0 0 16px}
+  .dgrow{display:flex;align-items:center;gap:10px;flex-wrap:wrap;justify-content:center}
+  .dgcol{display:flex;flex-direction:column;align-items:center;gap:10px}
+  .dgbox{border:2px solid var(--border);border-radius:10px;background:#11151c;padding:10px 14px;text-align:center;min-width:120px}
+  .dgbox .big{font-weight:700;font-size:14px;color:var(--text)}
+  .dgbox .smol{font-size:12px;color:var(--muted);margin-top:4px;line-height:1.4}
+  .dgbox.accent{border-color:var(--accent)} .dgbox.green{border-color:var(--accent2)} .dgbox.warn{border-color:var(--warn)} .dgbox.bad{border-color:#c0504d}
+  .arrow{color:var(--accent);font-size:26px;font-weight:700;line-height:1}
+  .arrowd{color:var(--accent);font-size:22px;font-weight:700;line-height:1}
+  .vs{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  .vs .card{border:2px solid var(--border);border-radius:10px;padding:14px;background:#11151c}
+  .vs .card.bad{border-color:#c0504d} .vs .card.good{border-color:var(--accent2)}
+  .vs h4{margin:0 0 10px;font-size:14px}
+  .vs .smol{font-size:13px;color:var(--muted);line-height:1.5}
+  @media (max-width:640px){.vs{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <h1>Blank Theme — Random-Layout Generator</h1>
+  <p class="sub">Session notes — 2026-07-08 · a "Blank design" flow for <strong>photobook</strong> &amp; <strong>layflat</strong> that builds N spreads, each filled with a <strong>random, non-repeating</strong> layout in a chosen images-per-spread range. Boxes stay empty. Reuses the Shuffle reducers for placement; fetches the layouts catalog <strong>once</strong> then runs from a local cache.</p>
+
+  <nav class="docnav">
+    <a href="architecture.md">🏛️ Architecture →</a>
+    <a href="upload-pipeline.md">⬆️ Upload Pipeline →</a>
+    <a href="photobook-full-cover-sync-2026-06-19.html">🅿️ Photobook Full Cover Sync →</a>
+    <a href="canvas-rulers-2026-06-24.html">📏 Canvas Rulers →</a>
+    <a href="OFFLINE_ASSETS_DASHBOARD.html">📦 Offline Assets →</a>
+    <a class="here">🎲 Blank Theme Generator (2026-07-08) — you are here</a>
+  </nav>
+
+  <blockquote>Scope: a generator (<code>generateRandomLayoutPages</code>) shared by two entry points — the design-selection <strong>Blank design</strong> card and the in-editor Themes-tab card. It builds empty pages then drives the <em>same</em> layout-apply reducers the Layout sidebar's Shuffle uses, so it inherits their proven scaling/bleed math. Photobook / layflat only.</blockquote>
+
+  <h2>TL;DR</h2>
+  <table>
+    <tr><th>Topic</th><th>Detail</th></tr>
+    <tr><td>What it is</td><td>Create N pages, each filled with a <strong>random, non-repeating</strong> layout whose image count is in <code>[min, max]</code>. Image boxes are <strong>empty</strong> — user adds photos later.</td></tr>
+    <tr><td>Where it lives</td><td>Core: <code>src/library/utils/helpers/blankThemeGenerator.js</code>. Entry points: <code>CreateNewDesignModal.jsx</code> (design-selection) &amp; <code>BlankThemeDialog.jsx</code> (in-editor). Card: <code>ThemeBrowser.jsx</code>.</td></tr>
+    <tr><td>Golden rule</td><td><strong>No hand-rolled scaling.</strong> Build blank pages → per page dispatch <code>setPageLayout</code> (single) / <code>setEntireSpreadLayout</code> (spread). Those reducers own the math; pre-scaling the catalog with <code>scaleLayout</code> makes their factor collapse to identity.</td></tr>
+    <tr><td>Cache-first</td><td>Layouts catalog: <strong>in-memory → durable local cache → API</strong>. The API is hit <strong>only</strong> when nothing is stored locally; then the catalog is persisted so future generates run offline.</td></tr>
+    <tr><td>No repeats</td><td>A <code>usedIds</code> set makes each page prefer an <strong>unused</strong> layout; repeats only when an image-count is exhausted, with a nearest-count fallback.</td></tr>
+    <tr><td><span class="warn">⚠️ Split factor</span></td><td>Photobook/foldable → <code>splitby=2</code> (half-width sides). Layflat (non-foldable) → <code>splitby=1</code> (full-width). Must match the Layout sidebar or every layout is halved/doubled.</td></tr>
+  </table>
+
+  <h2>How it works — at a glance 🎯</h2>
+
+  <div class="diagram">
+    <div class="dtitle">The pipeline</div>
+    <p class="plain">Prime the store with the target type + size, fetch layouts cache-first, build empty pages, then fill each page by driving the same reducers Shuffle uses. Read the built pages back out and open the editor.</p>
+    <div class="dgrow">
+      <div class="dgbox accent"><div class="big">prime store</div><div class="smol">setEditorType +<br>setCanvasSize +<br>setSettings (merge)</div></div>
+      <span class="arrow">→</span>
+      <div class="dgbox"><div class="big">fetch layouts</div><div class="smol">cache-first,<br>scale to size,<br>group by count</div></div>
+      <span class="arrow">→</span>
+      <div class="dgbox"><div class="big">build N blank pages</div><div class="smol">layout: [] →<br>applyTheme</div></div>
+      <span class="arrow">→</span>
+      <div class="dgbox"><div class="big">fill each page</div><div class="smol">setPageNumber +<br>setPageLayout /<br>setEntireSpreadLayout</div></div>
+      <span class="arrow">→</span>
+      <div class="dgbox green"><div class="big">open editor</div><div class="smol">read pages back,<br>setThemeApplied</div></div>
+    </div>
+  </div>
+
+  <div class="diagram">
+    <div class="dtitle">Cache-first layouts — the "don't spam the API" part</div>
+    <p class="plain">Three tiers. The API is the last resort; once fetched, the raw catalog is persisted so it's never fetched again.</p>
+    <div class="dgrow">
+      <div class="dgcol">
+        <div class="dgbox green"><div class="big">① in-memory</div><div class="smol">this session</div></div>
+        <span class="arrowd">↓ miss</span>
+        <div class="dgbox accent"><div class="big">② durable cache</div><div class="smol">AppData / localStorage<br><code>blankgen_pool_N</code></div></div>
+        <span class="arrowd">↓ miss</span>
+        <div class="dgbox warn"><div class="big">③ layouts API</div><div class="smol">full catalog once →<br>persist to ① &amp; ②</div></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="diagram">
+    <div class="dtitle">Spread vs single — one shared <code>usedIds</code> set for variety</div>
+    <p class="plain">Each page index is classified (mirrors the Layout sidebar). Covers are single; photobook interior is a 2-up spread. Every pick avoids a layout already used.</p>
+    <div class="dgrow">
+      <div class="dgbox"><div class="big">page 0 · cover</div><div class="smol">single → setPageLayout</div></div>
+      <div class="dgbox accent"><div class="big">page 2 · interior</div><div class="smol">spread → setEntireSpreadLayout</div></div>
+      <div class="dgbox accent"><div class="big">page 3 · interior</div><div class="smol">spread (different layout)</div></div>
+      <div class="dgbox"><div class="big">last · back cover</div><div class="smol">single</div></div>
+    </div>
+  </div>
+
+  <h2>The core function</h2>
+  <pre>// src/library/utils/helpers/blankThemeGenerator.js
+export async function generateRandomLayoutPages(dispatch, { pageCount, minImages, maxImages }) {
+  const { editorType, canvasSize, settings } = store.getState().canvas.present;
+
+  const usesHalfWidthLayout = editorType === PHOTOBOOK || settings.isFoldable;
+  const splitby   = usesHalfWidthLayout ? 2 : 1;               // MUST match the sidebar
+  const fullWidth = canvasSize.width, height = canvasSize.height;
+
+  const spreadFlags = range(total).map(i => isSpreadIndex(editorType, settings, i, total));
+  const [spreadPool, pagePool] = await Promise.all([          // cache-first, scaled, grouped
+    needSpread ? fetchLayoutPool(2, fullWidth, height, splitby) : {},
+    needSingle ? fetchLayoutPool(1, fullWidth, height, splitby) : {},
+  ]);
+
+  dispatch(applyTheme(range(total).map(makeBlankPage)));       // pages with layout: []
+
+  const usedIds = new Set();                                   // no repeats
+  for (let i = 0; i < total; i++) {
+    const target = randInt(minImages, maxImages);
+    dispatch(setPageNumber(i));
+    if (spreadFlags[i]) dispatch(setEntireSpreadLayout(pickLayout(spreadPool, target, usedIds)));
+    else { dispatch(setActiveSide(0)); dispatch(setPageLayout(pickLayout(pagePool, target, usedIds)[0])); }
+  }
+  return clone(store.getState().canvas.present.pages);         // built pages, for persisting
+}</pre>
+
+  <h2>Opening the design — swap one variable</h2>
+  <p>The design-selection path reuses the <em>entire</em> existing blank-design open flow; only the pages differ.</p>
+  <pre>// CreateNewDesignModal.handleCreate (customer path)
+dispatch(setEditorType(type));
+dispatch(setSettings({ subtype:"", isFoldable:false, showFullCoverSheet:false, coverEnabled:false })); // MERGE
+dispatch(setCanvasSize({ width, height, depth:0, safeMargin, bleedMargin, dpi }));
+
+const themePagesData = wantRandom
+  ? await generateRandomLayoutPages(dispatch, { pageCount, minImages, maxImages })
+  : [emptyPage];                       // ← the ONLY line that changed
+
+dispatch(UndoActionCreators.clearHistory());
+// … existing compress + saveDesignToLibrary + navigate(restore=1) …
+dispatch(setThemeApplied(true));       // Footer/canvas leave the skeleton state</pre>
+
+  <h2>Three bugs it hit — and why</h2>
+  <div class="vs">
+    <div class="card bad">
+      <h4>❌ Crash: <code>reading 'some' of undefined</code></h4>
+      <p class="smol"><code>replaceSettings({subtype:""})</code> wiped <code>settings.selectedMenuItems</code>; the customer Sidebar does <code>settings.selectedMenuItems.some(...)</code> unguarded.</p>
+    </div>
+    <div class="card good">
+      <h4>✅ Fix</h4>
+      <p class="smol">Use <code>setSettings</code> (<strong>merge</strong>), not replace — keeps <code>selectedMenuItems</code>. And guard the Sidebar read (fall back to the full menu).</p>
+    </div>
+    <div class="card bad">
+      <h4>❌ Footer stuck loading</h4>
+      <p class="smol">Footer gates on <code>projectSetup.isThemeApplied</code>. The customer create path navigates <code>restore=1</code> without staging a snapshot, so <code>useEditorSnapshot</code>'s <code>setThemeApplied(true)</code> never fired.</p>
+    </div>
+    <div class="card good">
+      <h4>✅ Fix</h4>
+      <p class="smol">Dispatch <code>setThemeApplied(true)</code> in the customer create path — a design <em>is</em> applied.</p>
+    </div>
+    <div class="card bad">
+      <h4>❌ Same layout repeated</h4>
+      <p class="smol"><code>pickLayout</code> had no memory of what it already placed.</p>
+    </div>
+    <div class="card good">
+      <h4>✅ Fix</h4>
+      <p class="smol">Shared <code>usedIds</code> set; prefer unused layouts, nearest-count fallback, repeat only when exhausted.</p>
+    </div>
+  </div>
+
+  <h2>Porting recipe (any app / theme / website)</h2>
+  <p>Framework-agnostic — you need four capabilities:</p>
+  <table>
+    <tr><th>Capability</th><th>What it is · what to reuse</th></tr>
+    <tr><td>Layouts catalog</td><td>List of templates, each with an image count + boxes in some reference space. Filterable by image count and single-vs-spread.</td></tr>
+    <tr><td>Layout → canvas placer</td><td><strong>Reuse your editor's existing "apply a layout to a page".</strong> Don't reimplement the geometry. (Here: <code>setPageLayout</code> / <code>setEntireSpreadLayout</code>.)</td></tr>
+    <tr><td>Page model</td><td>Create N empty pages; apply a layout to page <code>i</code>. (Here: <code>applyTheme</code> + <code>setPageNumber</code>.)</td></tr>
+    <tr><td>Cache</td><td>Any KV store, memory + durable. Store the raw catalog under a stable key; read before fetching.</td></tr>
+  </table>
+  <pre>function generate(pageCount, minImages, maxImages) {
+  const layouts = cacheFirstFetch();            // memory → durable → API
+  const used = new Set();
+  const pages = [];
+  for (let i = 0; i < pageCount; i++) {
+    const target   = randInt(minImages, maxImages);
+    const template = pickUnused(layouts, target, used);   // nearest-count fallback
+    const page     = newBlankPage();
+    applyLayout(page, template, targetPageSize);          // REUSE your placer
+    pages.push(page);
+  }
+  return pages;
+}</pre>
+
+  <h2>Gotchas checklist</h2>
+  <ul>
+    <li><span class="ok">✔</span> Set <code>editorType</code> + <code>canvasSize</code> (+ clean settings) <strong>before</strong> generating — reducers read the store synchronously.</li>
+    <li><span class="ok">✔</span> <code>splitby</code> must match the Layout sidebar (photobook/foldable = 2, layflat = 1).</li>
+    <li><span class="ok">✔</span> <code>isSpreadIndex</code> must match the sidebar's spread eligibility.</li>
+    <li><span class="ok">✔</span> <strong>Merge</strong> settings, never replace (keeps <code>selectedMenuItems</code> etc.).</li>
+    <li><span class="ok">✔</span> Set <code>isThemeApplied</code> (or your "ready" flag) after applying pages.</li>
+    <li><span class="ok">✔</span> <code>clearHistory()</code> after generation (it floods the undo stack).</li>
+    <li><span class="ok">✔</span> Cache the raw catalog; only fetch when nothing is stored locally.</li>
+    <li><span class="ok">✔</span> Track <code>usedIds</code>; nearest-count fallback, then repeat.</li>
+  </ul>
+
+  <footer>
+    Companion markdown: <a href="blank-theme-generator-2026-07-08.md">blank-theme-generator-2026-07-08.md</a> ·
+    Core: <code>src/library/utils/helpers/blankThemeGenerator.js</code> ·
+    Photobook / layflat only · Session 2026-07-08.
+  </footer>
+
+</div>
+</body>
+</html>

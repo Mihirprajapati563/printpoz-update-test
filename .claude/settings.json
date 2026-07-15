@@ -1,0 +1,56 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "permissions": {
+    "allow": [
+      "Bash(npm run *)",
+      "Bash(npm install*)",
+      "Bash(npm ci*)",
+      "Bash(npx tsc*)",
+      "Bash(node scripts/*)",
+      "Bash(git status)",
+      "Bash(git add *)",
+      "Bash(git commit *)",
+      "Bash(git diff *)",
+      "Bash(git log *)",
+      "Read(electron/**)",
+      "Read(src/**)",
+      "Read(docs/**)",
+      "Read(public/**)"
+    ],
+    "deny": [
+      "Bash(rm -rf *)",
+      "Read(.env*)",
+      "Read(**/*.p12)",
+      "Read(**/*.pem)",
+      "Read(build-resources/**)"
+    ]
+  },
+  "env": {
+    "ELECTRON_DISABLE_SECURITY_WARNINGS": "false"
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Edit|Write|MultiEdit",
+        "hooks": [
+          { "type": "command", "command": "node scripts/hooks/block-secrets.mjs" }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write|MultiEdit",
+        "hooks": [
+          { "type": "command", "command": "node scripts/hooks/check-changed.mjs" }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          { "type": "command", "command": "node scripts/hooks/typecheck-and-test.mjs" }
+        ]
+      }
+    ]
+  }
+}

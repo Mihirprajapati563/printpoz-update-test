@@ -1,0 +1,170 @@
+1. This project is created using reactjs framework.
+
+2. This project is only frontend side of photo-editor  for designing photo book, calendar, acrylic prints, canvas print, photo prints and  photo items.
+
+3. Our  main component is @src/layout/index.jsx which is used to render the main layout of the editor.
+
+4. Dont change or modify folder structure.
+
+5. All the common-components are stored in @src/common-components folder and subfolder.
+
+6. All the design-components are stored in @src/components folder and subfolder (e.g., text, sticker ,photo,shape,canvas,dynamic calendar etc) which is helping us to deign in the canvas.
+
+7. Our  main  designing component is stored in @src/components/canvas/Canvas.jsx which is used to render the canvas and all the design on it.
+
+8. All the popups are stored in @src/components/popups folder (e.g., editorSettings, sizeSettings,objectProperties etc).
+
+9. Our main layout components are stored in @src/layout folder (e.g., header,footer,sidebar, topActions,bottomActions etc). 
+
+10. All canvas components (e.g, photo,sticker,shape) which are used in  any product preview are stored in @src/layout/preview folder.
+
+11. All the tools are stored in @src/tools folder and subfolder (e.g., photos, layouts, background, stickers, text, frames, masks etc) with its related components.
+
+12. All the 2D or 3D Priview components of products are stored in @src/products-preview folder and subfolder (e.g., photobook, canvas print, acrylic print).
+
+13. All the assets are stored in @src/assets folder and subfolder (e.g., images,icons,svg, videos etc).
+
+14. All the styled components and global style classes are stored in @src/common-components/StyledComponents.jsx.
+
+15. All the utils are stored in @src/library/utils folder and subfolder.
+
+16. All  the redux slices are stored in @src/store/slices/ folder
+
+17. Our main store configuration is stored in @src/store/store.jsx.
+
+18. All .glb files for 3D preview are stored in @public/3d folder.
+
+19. canvasSliceGetter are stored in @src/library/utils/helpers/canvasSliceGetters.js.
+
+20. All the common functions are stored in @src/library/utils/common-functions  folder.
+
+21. All the common services are stored in @src/library/utils/common-services folder.
+
+22. All the constants are stored in @src/library/utils/constants folder.
+
+23. All the custom hooks are stored in @src/library/utils/custom-hooks folder.
+
+24. All  the jsons are stored in @src/library/utils/jsons folder.
+
+25. All the threejs related functions are stored in @src/library/utils/three-js-functions folder.
+
+26. Use functional and declarative programming patterns; avoid classes.
+
+27. Use descriptive variable names with auxiliary verbs (e.g., isLoading, hasError)
+
+28. Naming Conventions
+    -Use lowercase with dashes for directories (e.g., components/canvas)
+    -Favor named exports for components and utilities
+    -Use PascalCase for component files (e.g., Canvas.jsx)
+    -Use camelCase for utility files (e.g., canvasSliceGetters.js)
+29. Use javascript  for all components and utilities with latest ES syntax and best practices.  
+
+30.  Syntax and Formatting:
+    -Use "function" keyword for pure functions
+    -Avoid unnecessary curly braces in conditionals
+    -Use declarative JSX
+31.  UI and Styling:
+    - All components should be modern and responsive
+    -Use Bootstrap for styling with its prebuilt components and grid system to create responsive UI.
+    -use `npm install react-bootstrap bootstrap` to install it globally (this is already done).
+    -use react-icons for icons
+
+32.  Error Handling:
+    -Implement proper error boundaries
+    -Log errors appropriately for debugging
+    -Provide user-friendly error messages
+    -Handle network failures gracefully
+
+33. Security:
+ -Sanitize user input
+ -Handle sensitive data carefully
+
+34. Performance Optimizations:
+  -Optimize code for maximum speed
+  -Use memoization where possible
+
+35. Code Reuse and Modularization:
+  -Reuse components and functions where possible
+  -Create reusable components and functions using functional and declarative programming patterns
+  -Use redux for state management
+  -Use redux-thunk for async actions
+
+36. Accessibility:
+  -Implement accessibility best practices
+  -Use aria-label and aria-labelledby attributes where necessary
+  -Use alt attribute for images
+  -Use keyboard navigation for accessibility
+
+37. Git Usage:  
+    Commit Message Prefixes:
+     -"fix:" for bug fixes
+     -"feat:" for new features
+     -"perf:" for performance improvements
+     -"docs:" for documentation changes
+     -"style:" for formatting changes
+     -"refactor:" for code refactoring
+     -"test:" for adding missing tests
+     -"chore:" for maintenance tasks
+     -"build:" for changes that affect the build system or external dependencies
+    Commit Rules:
+        -Use lowercase for commit messages
+        -Keep the summary line concise
+        -Include description for non-obvious changes
+        -Reference issue numbers when applicable
+   -always create a new branch for each feature or bug fix
+   -always push the changes to the remote repository before making a pull request
+
+38. Code Quality:
+    -Follow coding conventions and best practices
+    -Use consistent naming conventions
+    -Use consistent indentation and spacing
+    -Use comments to explain code logic
+    -Use linting and formatting tools
+    
+39. API Calls:
+    -always use  utilities functions for api calls which defined in @src/library/utils/common-services/apiCall.js (e.g., apiPost, apiGet)
+    -must use try catch block while making api calls
+    -always use  defined endpoints for api calls which defined in @src/library/utils/constants/apiurl.js
+    -handle errors from api calls with appropriate messages
+
+40. Don't Do:
+    -Don't change change or modify folder structure
+    -Don't make api calls without using  utilities functions for api calls which defined in @src/library/utils/common-services/apiCall.js
+    -Don't make api calls without permission
+    -Don't create any design that create horizontal overflow of browser scroll. it should be responsive and adjustable in available space.
+    -Don't create any sample data json file. 
+    -Don't make any changes to @instructions folder.
+    -Don't change any component logic and style which affects the app behavior or appearance.
+    -Don't change any 3D preview .glb files.
+    -Don't change in any utiities files.
+    -Don't change any redux slices.
+    -Don't change in canvasSliceGetters.js file.
+
+41. Must Do:
+    -must use try catch block while making api calls
+    -must use  utilities functions for api calls which defined in @src/library/utils/common-services/apiCall.js (e.g., apiPost, apiGet)
+    -must use  defined endpoints for api calls which defined in @src/library/utils/constants/apiurl.js
+    -must handle errors from api calls with appropriate messages
+
+42. Code Review:
+    -code should be structured and organized
+    -code should be readable and maintainable
+    -code should be efficient and perform well
+    -code should be free of errors and bugs
+    -always provide clear and concise comments
+
+
+    
+
+
+
+
+
+
+
+   
+
+
+
+
+

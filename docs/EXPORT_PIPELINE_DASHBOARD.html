@@ -1,0 +1,425 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Desktop Export Pipeline — Technical Specification</title>
+<style>
+  :root { --bg:#FAF5EB; --surface:#fff; --ink:#1B1A18; --ink2:#44403A; --muted:#897F71;
+          --line:#E6DBC6; --accent:#B85535; --accent2:#2F6E47; --code:#2C2925; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink2);
+         font:16px/1.65 -apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif; }
+  .wrap { max-width:880px; margin:0 auto; padding:40px 24px 90px; }
+  a { color:var(--accent); text-decoration:none; }
+  a:hover { text-decoration:underline; }
+  h1 { color:var(--ink); font-size:30px; letter-spacing:-.4px; margin:14px 0 6px; }
+  h2 { color:var(--ink); font-size:22px; margin:42px 0 10px; padding-top:14px; border-top:1px solid var(--line); }
+  h3 { color:var(--ink); font-size:17px; margin:26px 0 8px; }
+  p.lead { font-size:18px; color:var(--ink); }
+  blockquote { margin:18px 0; padding:12px 18px; background:#F3ECDD; border-left:4px solid var(--accent);
+               border-radius:0 10px 10px 0; color:var(--ink2); }
+  table { border-collapse:collapse; width:100%; margin:16px 0; font-size:14px; background:var(--surface);
+          border:1px solid var(--line); border-radius:10px; overflow:hidden; }
+  th,td { text-align:left; padding:10px 13px; border-bottom:1px solid var(--line); vertical-align:top; }
+  th { background:#F3ECDD; color:var(--ink); font-size:12px; text-transform:uppercase; letter-spacing:.5px; }
+  tr:last-child td { border-bottom:none; }
+  code { background:#F3ECDD; padding:2px 6px; border-radius:6px; font-size:13px;
+         color:var(--code); font-family:SFMono-Regular,Consolas,monospace; }
+  pre { background:#26231F; color:#EDE3CF; padding:18px; border-radius:12px; overflow:auto;
+        font:13px/1.5 SFMono-Regular,Consolas,monospace; margin:12px 0; }
+  pre code { background:none; color:inherit; padding:0; }
+  ul,ol { padding-left:22px; }
+  li { margin:5px 0; }
+  .ok { color:var(--accent2); font-weight:700; }
+
+  /* Flow diagrams */
+  .flow { background:var(--surface); border:1px solid var(--line); border-radius:12px;
+          padding:20px; margin:20px 0; }
+  .flow-title { font-size:13px; font-weight:700; text-transform:uppercase; letter-spacing:.5px;
+                color:var(--muted); margin-bottom:12px; }
+  .flow pre { margin:0; background:#FBF8F2; color:var(--ink2); border:1px solid var(--line); }
+
+  /* Tags */
+  .tag { display:inline-block; padding:2px 8px; border-radius:4px; font-size:11px;
+         font-weight:700; text-transform:uppercase; letter-spacing:.5px; vertical-align:middle; }
+  .tag-web { background:#FFE0E0; color:#B71C1C; }
+  .tag-desktop { background:#DBEFD8; color:#1B5E20; }
+  .tag-both { background:#FFF3CD; color:#7A5E00; }
+
+  /* Comparison grid */
+  .compare-grid { display:grid; grid-template-columns:1fr 1fr; gap:16px; margin:20px 0; }
+  .compare-card { background:var(--surface); border:1px solid var(--line); border-radius:10px; padding:16px; }
+  .compare-card h4 { margin:0 0 8px; font-size:15px; color:var(--ink); }
+  .compare-card .metric { display:flex; justify-content:space-between; padding:6px 0;
+                          border-bottom:1px solid var(--line); font-size:13px; }
+  .compare-card .metric:last-child { border-bottom:none; }
+  .compare-card .metric .val { font-weight:700; }
+  @media(max-width:640px){ .compare-grid { grid-template-columns:1fr; } }
+
+  /* Tabs */
+  .tabs { display:flex; gap:0; border-bottom:1px solid var(--line); margin:16px 0 0; }
+  .tab { background:none; border:none; border-bottom:2px solid transparent; padding:10px 16px;
+         font:inherit; font-size:14px; font-weight:600; color:var(--muted); cursor:pointer; }
+  .tab.active { color:var(--accent); border-bottom-color:var(--accent); }
+  .tab-panel { display:none; }
+  .tab-panel.active { display:block; }
+
+  /* Document Navigation */
+  .doc-nav { display: flex; gap: 8px; border-bottom: 1px solid var(--line); margin-bottom: 24px; padding-bottom: 12px; }
+  .nav-item { color: var(--muted); text-decoration: none; font-size: 14px; font-weight: 600; padding: 6px 12px; border-radius: 6px; transition: all 0.15s ease-in-out; }
+  .nav-item:hover { color: var(--ink); background: #F3ECDD; }
+  .nav-item.active { color: var(--accent); background: #F3ECDD; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="doc-nav">
+    <a href="OFFLINE_ASSETS_DASHBOARD.html" class="nav-item">Offline Assets Spec</a>
+    <a href="EXPORT_PIPELINE_DASHBOARD.html" class="nav-item active">Export Pipeline Spec</a>
+  </div>
+
+  <h1>Desktop Export Pipeline</h1>
+  <p class="lead">SVG → JPEG rendering moves from server-side headless Chrome to a local Electron offscreen
+  <code>BrowserWindow</code>. Zero network traffic. 5–10× faster. Fully offline.</p>
+
+  <h2>1. The Problem</h2>
+  <p>The current export pipeline sends each page's SVG to the server API
+  (<code>POST /cart-editor-details/exportAsJpeg</code>), which renders it via headless Chrome and returns
+  a JPEG blob. For a 10-page photobook, this means 10 sequential HTTP round trips — each carrying
+  a multi-megabyte SVG payload up and receiving a multi-megabyte JPEG down.</p>
+
+  <div class="compare-grid">
+    <div class="compare-card">
+      <h4><span class="tag tag-web">Web Export</span></h4>
+      <div class="metric"><span>Network per page</span><span class="val">2–5 MB</span></div>
+      <div class="metric"><span>Latency per page</span><span class="val">300–800 ms</span></div>
+      <div class="metric"><span>10-page PDF</span><span class="val">5–10 seconds</span></div>
+      <div class="metric"><span>Offline</span><span class="val" style="color:var(--accent)">No</span></div>
+      <div class="metric"><span>Save location</span><span class="val">Downloads only</span></div>
+      <div class="metric"><span>Font handling</span><span class="val">Re-fetched server-side</span></div>
+    </div>
+    <div class="compare-card">
+      <h4><span class="tag tag-desktop">Desktop Export</span></h4>
+      <div class="metric"><span>Network per page</span><span class="val">0 bytes</span></div>
+      <div class="metric"><span>Latency per page</span><span class="val">50–150 ms</span></div>
+      <div class="metric"><span>10-page PDF</span><span class="val">0.5–1.5 seconds</span></div>
+      <div class="metric"><span>Offline</span><span class="val ok">Yes</span></div>
+      <div class="metric"><span>Save location</span><span class="val ok">User-chosen path</span></div>
+      <div class="metric"><span>Font handling</span><span class="val ok">Cached WOFF2 on disk</span></div>
+    </div>
+  </div>
+
+  <h2>2. How It Works</h2>
+
+  <div class="flow">
+    <div class="flow-title">Web (Current)</div>
+    <pre><code>Canvas pages → svgData.svgContent[i]
+  → apiPost(exportAsJPG, { svgDetails, fonts, w, h })
+    → POST to server → headless Chrome render → JPEG blob response
+  → jsPDF.addImage(blob)
+  → saveAs(pdfBlob, "file.pdf")  // browser Downloads</code></pre>
+  </div>
+
+  <div class="flow">
+    <div class="flow-title">Desktop (Replacement)</div>
+    <pre><code>Canvas pages → svgData.svgContent[i]
+  → IPC "export:renderSvg" (svgContent, width, height)
+    → Main process: hidden BrowserWindow (offscreen: true)
+    → Load SVG + @font-face rules (cached WOFF2 files)
+    → document.fonts.ready → capturePage() → toJPEG(95)
+    → Return Buffer via IPC
+  → jsPDF.addImage(buffer)
+  → desktop.dialog.saveAs()
+    → desktop.fs.writeFile(chosenPath)  // any folder</code></pre>
+  </div>
+
+  <h2>3. Code Changes</h2>
+
+  <h3>3.1 Files that call <code>ENDPOINTS.exportAsJPG</code></h3>
+  <p>Every one of these files needs an <code>if (isDesktop)</code> branch to route through IPC:</p>
+
+  <table>
+    <tr><th>File</th><th>Call Sites</th><th>Context</th></tr>
+    <tr>
+      <td><code>useExportPages.js</code></td>
+      <td>Lines 153, 291, 326, 443, 496, 569, 619</td>
+      <td>Main export hook — PDF, multi-PDF, JPEG batch, individual JPEG</td>
+    </tr>
+    <tr>
+      <td><code>getTrimmedPreviewTexture.js</code></td>
+      <td>Line 30</td>
+      <td>Product preview thumbnail generation</td>
+    </tr>
+    <tr>
+      <td><code>export/index.js</code></td>
+      <td>Line 16</td>
+      <td>Legacy <code>SvgToJPG()</code> utility function</td>
+    </tr>
+  </table>
+
+  <h3>3.2 Files that call <code>saveAs()</code></h3>
+  <p>Each <code>saveAs()</code> is replaced with native OS save dialog on desktop:</p>
+
+  <table>
+    <tr><th>File</th><th>Line</th><th>What's Saved</th></tr>
+    <tr>
+      <td><code>useExportPages.js</code></td>
+      <td>228</td>
+      <td>Single PDF file</td>
+    </tr>
+    <tr>
+      <td><code>useExportPages.js</code></td>
+      <td>393</td>
+      <td>Multi-PDF ZIP file</td>
+    </tr>
+    <tr>
+      <td><code>useExportPages.js</code></td>
+      <td>537, 660</td>
+      <td>JPEG batch ZIP / individual JPEG</td>
+    </tr>
+    <tr>
+      <td><code>MaskImage.jsx</code></td>
+      <td>58</td>
+      <td>Exported mask image</td>
+    </tr>
+  </table>
+
+  <h2>4. Implementation Code</h2>
+
+  <div class="tabs">
+    <button class="tab active" onclick="showTab(0)">Renderer (Main Process)</button>
+    <button class="tab" onclick="showTab(1)">IPC Registration</button>
+    <button class="tab" onclick="showTab(2)">React Interception</button>
+    <button class="tab" onclick="showTab(3)">Save Dialog</button>
+  </div>
+
+  <div class="tab-panel active" id="panel-0">
+  <pre><code>// electron/main/services/exporter.ts
+import { BrowserWindow } from "electron";
+
+export async function renderSvgToJpeg(
+  svgContent: string,
+  width: number,
+  height: number,
+  fontFaceCSS: string = ""
+): Promise&lt;Buffer&gt; {
+  const win = new BrowserWindow({
+    width: Math.ceil(width),
+    height: Math.ceil(height),
+    show: false,
+    webPreferences: { offscreen: true },
+  });
+
+  const html = `&lt;!DOCTYPE html&gt;
+    &lt;html&gt;&lt;head&gt;&lt;style&gt;
+      ${fontFaceCSS}
+      *{margin:0;padding:0;box-sizing:border-box}
+      body{overflow:hidden}
+    &lt;/style&gt;&lt;/head&gt;
+    &lt;body&gt;${svgContent}&lt;/body&gt;&lt;/html&gt;`;
+
+  await win.loadURL(
+    \`data:text/html;charset=utf-8,\${encodeURIComponent(html)}\`
+  );
+
+  // Ensure all @font-face declarations finish loading
+  await win.webContents.executeJavaScript("document.fonts.ready");
+
+  // Allow a paint frame to commit
+  await new Promise(r => setTimeout(r, 50));
+
+  const image = await win.webContents.capturePage();
+  win.close();
+
+  return image.toJPEG(95);  // 95% quality
+}</code></pre>
+  </div>
+
+  <div class="tab-panel" id="panel-1">
+  <pre><code>// electron/main/ipc/export.ipc.ts
+import { ipcMain } from "electron";
+import { renderSvgToJpeg } from "../services/exporter";
+import { buildFontFaceCSS } from "../services/fontResolver";
+
+export function registerExportIPC() {
+  ipcMain.handle(
+    "export:renderSvg",
+    async (_event, svgContent, width, height, fontRefs) => {
+      // Build @font-face CSS from cached WOFF2 files
+      const fontCSS = fontRefs?.length ? buildFontFaceCSS(fontRefs) : "";
+
+      const jpegBuffer = await renderSvgToJpeg(
+        svgContent, width, height, fontCSS
+      );
+
+      // Return as ArrayBuffer for IPC transport
+      return jpegBuffer.buffer.slice(
+        jpegBuffer.byteOffset,
+        jpegBuffer.byteOffset + jpegBuffer.byteLength
+      );
+    }
+  );
+}</code></pre>
+  </div>
+
+  <div class="tab-panel" id="panel-2">
+  <pre><code>// Inside useExportPages.js — wrapping each exportAsJPG call
+import { isDesktop, desktop } from "../../desktop";
+
+async function renderPage(svgContent, width, height, fontRefs) {
+  if (isDesktop) {
+    // Route through local Electron renderer
+    const arrayBuffer = await desktop.export.renderSvg(
+      svgContent, width, height, fontRefs
+    );
+    return new Blob([arrayBuffer], { type: "image/jpeg" });
+  }
+
+  // Web fallback — server-side render
+  return await apiPost(ENDPOINTS.exportAsJPG, {
+    svgDetails: svgContent,
+    w: width,
+    h: height,
+  }, { responseType: "blob" });
+}
+
+// Usage (replacing every apiPost(ENDPOINTS.exportAsJPG, ...) call):
+const jpegBlob = await renderPage(
+  imageData.svgDetails,
+  imageData.w,
+  imageData.h,
+  designFontRefs
+);</code></pre>
+  </div>
+
+  <div class="tab-panel" id="panel-3">
+  <pre><code>// Replace saveAs() with native dialog on desktop
+
+async function saveFile(blob, defaultFilename, filters) {
+  if (isDesktop) {
+    const result = await desktop.dialog.saveAs({
+      title: "Save Export",
+      defaultPath: defaultFilename,
+      filters: filters || [
+        { name: "PDF", extensions: ["pdf"] },
+        { name: "JPEG", extensions: ["jpg", "jpeg"] },
+      ],
+    });
+
+    if (result.filePath) {
+      const buffer = await blob.arrayBuffer();
+      await desktop.fs.writeFile(result.filePath, buffer);
+      return true;  // saved
+    }
+    return false;  // cancelled
+  }
+
+  // Web fallback
+  saveAs(blob, defaultFilename);
+  return true;
+}
+
+// Usage:
+await saveFile(pdfBlob, `${timestamp}.pdf`, [
+  { name: "PDF Files", extensions: ["pdf"] },
+]);</code></pre>
+  </div>
+
+  <h2>5. Edge Cases &amp; Mitigations</h2>
+
+  <table>
+    <tr><th>Scenario</th><th>Impact</th><th>Mitigation</th></tr>
+    <tr>
+      <td>Font not cached at export time</td>
+      <td>Text renders in system fallback font</td>
+      <td><code>loadDesignFonts()</code> pre-caches all fonts when project loads. Export should rarely encounter missing fonts.</td>
+    </tr>
+    <tr>
+      <td>Very large canvas (6000×4000+)</td>
+      <td>High GPU memory during <code>capturePage()</code></td>
+      <td>Process pages sequentially (not in parallel). One hidden window at a time.</td>
+    </tr>
+    <tr>
+      <td>SVG contains <code>&lt;image&gt;</code> with remote URL</td>
+      <td>Image loads from network in hidden window</td>
+      <td>User photos use <code>app-assets://</code> — no network. Only uncached library assets would hit this.</td>
+    </tr>
+    <tr>
+      <td>Export cancelled mid-batch</td>
+      <td>Hidden BrowserWindow may be orphaned</td>
+      <td>Track window reference. On cancel, call <code>win.close()</code> immediately. Use AbortController pattern.</td>
+    </tr>
+    <tr>
+      <td>High DPI / Retina display</td>
+      <td><code>capturePage()</code> may capture at 2×</td>
+      <td>Explicitly set <code>scaleFactor: 1</code> in <code>capturePage()</code> options for consistent output size.</td>
+    </tr>
+  </table>
+
+  <h2>6. New Files Summary</h2>
+
+  <table>
+    <tr><th>File</th><th>Status</th><th>Purpose</th></tr>
+    <tr>
+      <td><code>electron/main/services/exporter.ts</code></td>
+      <td><span class="tag tag-desktop">New</span></td>
+      <td>Offscreen SVG → JPEG render logic</td>
+    </tr>
+    <tr>
+      <td><code>electron/main/services/fontResolver.ts</code></td>
+      <td><span class="tag tag-desktop">New</span></td>
+      <td>Build <code>@font-face</code> CSS from cached WOFF2 files</td>
+    </tr>
+    <tr>
+      <td><code>electron/main/ipc/export.ipc.ts</code></td>
+      <td><span class="tag tag-desktop">New</span></td>
+      <td>Register <code>export:renderSvg</code> IPC handler</td>
+    </tr>
+  </table>
+
+  <table>
+    <tr><th>File</th><th>Status</th><th>Change</th></tr>
+    <tr>
+      <td><code>electron/shared/ipc.ts</code></td>
+      <td><span class="tag tag-both">Modified</span></td>
+      <td>Add <code>export:renderSvg</code> channel constant</td>
+    </tr>
+    <tr>
+      <td><code>electron/preload/index.ts</code></td>
+      <td><span class="tag tag-both">Modified</span></td>
+      <td>Expose <code>desktop.export.renderSvg()</code></td>
+    </tr>
+    <tr>
+      <td><code>src/desktop/index.js</code></td>
+      <td><span class="tag tag-both">Modified</span></td>
+      <td>Add <code>export.renderSvg()</code> to <code>DesktopApi</code></td>
+    </tr>
+    <tr>
+      <td><code>useExportPages.js</code></td>
+      <td><span class="tag tag-both">Modified</span></td>
+      <td>7 call sites wrapped with <code>isDesktop</code> guard</td>
+    </tr>
+    <tr>
+      <td><code>getTrimmedPreviewTexture.js</code></td>
+      <td><span class="tag tag-both">Modified</span></td>
+      <td>1 call site wrapped</td>
+    </tr>
+    <tr>
+      <td><code>export/index.js</code></td>
+      <td><span class="tag tag-both">Modified</span></td>
+      <td>1 call site wrapped</td>
+    </tr>
+  </table>
+
+</div>
+
+<script>
+function showTab(index) {
+  document.querySelectorAll('.tab').forEach((t,i) => t.classList.toggle('active', i === index));
+  document.querySelectorAll('.tab-panel').forEach((p,i) => p.classList.toggle('active', i === index));
+}
+</script>
+</body>
+</html>

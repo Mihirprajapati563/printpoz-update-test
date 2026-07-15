@@ -1,0 +1,389 @@
+// import React, { useRef, useEffect, useState } from "react";
+// import $ from 'jquery';
+// import 'turn.js';
+// import "./photoBookPreview.css"; // Your custom styles
+// import scissor from "../../utils/lib/scissor.js"; // Assuming scissor is properly set up
+// import previmage from "../Images/prev.png";
+// import nextimage from "../Images/next.png";
+// import { BodyText, Box, PhotoModalBody, PhotoModalHeader, PhotoModalStyled, FlexBox } from "../../components/styledComponents.jsx";
+// import { PhotoBookPreivewPages } from "./photoBookPreivewPages.jsx";
+// import { getAllPages, getAllObjectsSortedByZIndexByPageIndex } from '../../Helpers';
+// import { useSelector } from 'react-redux';
+// import { getCanvasSize } from '../../Helpers';
+// import { getResolutionScaleValue, calculateZoomRatio, hasAnyClass } from '../../utils/commonFunctions';
+
+// export const PhobookPreview = ({ show, handleClose }) => {
+//   const flipbookRef = useRef(null);
+//   const AllPages = useSelector(getAllPages);
+//   const canvasSize = useSelector(getCanvasSize);
+//   let [mainBookHeight, setMainBookHeight] = useState(0);
+//   let [mainBookWidth, setMainBookWidth] = useState(0);
+//   let bookwidth = 0;
+//   let bookheight = 0;
+
+//   //updatedepth function for update the left and right depth
+//   function updateDepth(book, newPage) {
+//     const page = book.turn("page");
+//     const totalPages = book.turn("pages");
+
+//     // Reset depth indicators
+//     $(".left-depth").css({ width: 0 });
+//     $(".right-depth").css({ width: 0 });
+
+//     newPage = newPage || page;
+
+//     // Left depth calculation
+//     if (newPage > 1) {
+//       // Left depth starts showing from page 4 onwards
+//       const leftDepthWidth = 16 * Math.min(1, (page * 2) / totalPages);
+//       $(".left-depth").css({
+//         width: leftDepthWidth,
+//         left: -1 - leftDepthWidth - bookwidth / 2,
+//         top: -bookheight / 2,
+//       });
+//     }
+
+//     // Right depth calculation
+//     if (newPage < totalPages - 1) {
+//       // Right depth appears until the second-last page
+//       const rightDepthWidth =
+//         16 * Math.min(1, ((totalPages - newPage) * 2) / totalPages);
+//       $(".right-depth").css({
+//         width: rightDepthWidth,
+//         left: bookwidth / 2 + 2,
+//         top: -bookheight / 2,
+//       });
+//     }
+//   }
+
+//   const adjustViewport = () => {
+//     const viewport = $(".flipbook-viewport");
+//     const flipbook = $(flipbookRef.current);
+
+//     // Adjust viewport size based on flipbook size
+//     const width = flipbook.width();
+//     const height = flipbook.height();
+
+//     viewport.css({
+//       width: `${width}px`,
+//       height: `${height}px`,
+//       overflow: "hidden",
+//     });
+//   };
+
+//   const handleNext = (e) => {
+//     e.preventDefault(); // Prevent default link behavior
+//     if (flipbookRef.current) {
+//       $(flipbookRef.current).turn("next");
+//     }
+//   };
+
+//   const handlePrev = (e) => {
+//     e.preventDefault(); // Prevent default link behavior
+//     if (flipbookRef.current) {
+//       $(flipbookRef.current).turn("previous");
+//     }
+//   };
+
+//   const options = {
+//     autoCenter: true,
+//     elevation: 100,
+//     gradients: true,
+//     duration: 1000,
+//     depth: true,
+//     when: {
+//       turning: function (e, page) {
+//         const book = $(this);
+//         const currentPage = book.turn("page");
+//         const totalPages = book.turn("pages");
+
+//         // Update the page number label
+//         if (page === 1) {
+//           $("#page-number-label").html("Front Cover");
+//         } else if (page === totalPages) {
+//           $("#page-number-label").html("Back Cover");
+//         } else {
+//           const fbpn = page % 2 ? `${page - 1}-${page}` : `${page}-${page + 1}`;
+//           $("#page-number-label").html(fbpn);
+//         }
+
+//         // Prevent flipping to non-existing pages
+//         if (currentPage > 3 && currentPage < totalPages - 3) {
+//           if (page === 1 || page === totalPages) {
+//             book.turn("page", page === 1 ? 2 : totalPages - 1);
+//             e.preventDefault();
+//           }
+//         }
+
+//         if (page === 1 || page === totalPages) {
+//           flipbookRef.current.classList.remove("flipbook-opened");
+//         } else {
+//           flipbookRef.current.classList.add("flipbook-opened");
+//         }
+//         updateDepth(book, page);
+//       },
+//       turned: function () {
+//         updateDepth($(this));
+//       },
+//       end: function () {
+//         updateDepth($(this));
+//       },
+//     },
+//   };
+
+//   // handletap function for click on image in any area it turn
+//   // const handleTap = (e) => {
+//   //   const book = $(flipbookRef.current);
+//   //   const currentPage = book.turn("page");
+//   //   const totalPages = book.turn("pages");
+//   //   const x = e.pageX - book.offset().left;
+
+//   //   console.log("Book", book.width());
+//   //   console.log("Current Page", currentPage);
+//   //   console.log("Total Pages", totalPages);
+//   //   console.log("X", x);
+
+//   //   if (x < book.width() / 2) {
+//   //     if (currentPage > 1) {
+//   //       book.turn("previous");
+//   //     }
+//   //   } else {
+//   //     if (currentPage < totalPages) {
+//   //       book.turn("next");
+//   //     }
+//   //   }
+//   // }
+
+
+//   const handleTap = (event) => {
+//     const pageX = event.pageX;
+//     const pageY = event.pageY;
+//     const bookOffset = $(flipbookRef.current).offset();
+//     const bookWidth = $(flipbookRef.current).width();
+
+//     console.log("Page X", pageX);
+//     console.log("Page Y", pageY);
+//     console.log("Book Offset", bookOffset);
+//     console.log("Book Width", bookWidth);
+
+//     // Determine if the tap was on the left or right side
+//     if (pageX < bookOffset.left + bookWidth / 2) {
+//       $(flipbookRef.current).turn("previous"); // Turn to the previous page
+//     } else {
+//       $(flipbookRef.current).turn("next"); // Turn to the next page
+//     }
+//   };
+
+
+//   // useEffect(() => {
+//   //   if (flipbookRef.current) {
+//   //     const maxWidth = $(window).width() - 60;
+//   //     const maxHeight = $(window).height() - 60;
+//   //     let imagewidth = 572;
+//   //     let imageheight = 752;
+//   //     const wrapper = flipbookRef.current;
+//   //     if (wrapper) {
+//   //       const result = getResolutionScaleValue(canvasSize.width, canvasSize.height, wrapper);
+//   //       if (result) {
+//   //         const { newWidth, newHeight } = result;
+//   //         imagewidth = newWidth / 2;
+//   //         imageheight = newHeight / 2;
+//   //         setMainBookWidth(imagewidth);
+//   //         setMainBookHeight(imageheight);
+//   //       }
+//   //     }
+
+//   //     let ratio = 0;
+
+//   //     // Adjust image dimensions based on max width and height
+//   //     if (imagewidth > maxWidth) {
+//   //       ratio = maxWidth / imagewidth;
+//   //       imageheight *= ratio;
+//   //       imagewidth *= ratio;
+//   //     }
+//   //     // Check if current height is larger than max
+//   //     if (imageheight > maxHeight) {
+//   //       ratio = maxHeight / imageheight;
+//   //       imagewidth *= ratio;
+//   //       imageheight *= ratio;
+//   //     }
+
+//   //     bookheight = imageheight;
+//   //     bookwidth = imagewidth;
+//   //     const topspace = -(bookheight / 2);
+//   //     const leftspace = -(bookwidth / 2 + 16);
+
+//   //     $(".flipbook-viewport .flipbook").css({
+//   //       width: bookwidth + "px",
+//   //       height: bookheight + "px",
+//   //       left: leftspace + "px",
+//   //       top: topspace + "px",
+//   //     });
+
+//   //     $(".flipbook-viewport .double").css({
+//   //       width: bookwidth + "px",
+//   //       height: bookheight + "px",
+//   //       "background-size": "100% 100%",
+//   //     });
+
+//   //     $(".flipbook-viewport .page").css({
+//   //       width: bookwidth + "px",
+//   //       height: bookheight + "px",
+//   //       "background-size": "100% 100%",
+//   //       "background-color": "#fff",
+//   //       "background-repeat": "no-repeat",
+//   //     });
+
+//   //     // Add class for each page
+//   //     $(".flipbook .double").scissor();
+//   //     $(flipbookRef.current).turn(options);
+//   //     updateDepth($(flipbookRef.current), 1);
+//   //     adjustViewport();
+//   //   }
+//   // }, [options]);
+
+//   useEffect(() => {
+//     if (flipbookRef.current) {
+//       const maxWidth = $(window).width() - 60;
+//       const maxHeight = $(window).height() - 60;
+
+//       console.log("Max Width", maxWidth);
+//       console.log("Max Height", maxHeight);
+
+//       let imagewidth = 572;
+//       let imageheight = 752;
+//       const wrapper = flipbookRef.current;
+
+//       if (wrapper) {
+//         const result = getResolutionScaleValue(canvasSize.width, canvasSize.height, wrapper);
+//         console.log("canvasSize", canvasSize);
+//         console.log("canvas width", canvasSize.width);
+//         console.log("canvas height", canvasSize.height);
+//         console.log("wrapper", wrapper);
+
+//         if (result) {
+//           const { newWidth, newHeight } = result;
+//           if (newWidth && newHeight) {
+//             imagewidth = newWidth / 2;
+//             imageheight = newHeight / 2;
+//             setMainBookWidth(imagewidth);
+//             setMainBookHeight(imageheight);
+
+//             console.log("New Width", newWidth);
+//             console.log("New Height", newHeight);
+//             console.log("Image Width", imagewidth);
+//             console.log("Image Height", imageheight);
+
+//           }
+//         }
+//       }
+
+//       let ratio = 0;
+
+//       // Adjust image dimensions based on max width and height
+//       if (imagewidth > maxWidth) {
+//         ratio = maxWidth / imagewidth;
+//         imageheight *= ratio;
+//         imagewidth *= ratio;
+//       }
+
+//       // Check if current height is larger than max
+//       if (imageheight > maxHeight) {
+//         ratio = maxHeight / imageheight;
+//         imagewidth *= ratio;
+//         imageheight *= ratio;
+//       }
+
+//       bookheight = imageheight;
+//       bookwidth = imagewidth;
+//       const topspace = -(bookheight / 2);
+//       const leftspace = -(bookwidth / 2 + 11);
+
+
+//       console.log("Book Width", bookwidth);
+//       console.log("Book Height", bookheight);
+//       console.log("Top Space", topspace);
+//       console.log("Left Space", leftspace);
+
+
+//       $(".flipbook-viewport .flipbook").css({
+//         width: bookwidth + "px",
+//         height: bookheight + "px",
+//         left: leftspace + "px",
+//         top: topspace + "px",
+//       });
+
+//       $(".flipbook-viewport .double").css({
+//         width: bookwidth + "px",
+//         height: bookheight + "px",
+//         "background-size": "100% 100%",
+//       });
+
+//       $(".flipbook-viewport .page").css({
+//         width: bookwidth + "px",
+//         height: bookheight + "px",
+//         "background-size": "100% 100%",
+//         "background-color": "#fff",
+//         "background-repeat": "no-repeat",
+//       });
+
+//       // Add class for each page
+//       $(".flipbook .double").scissor();
+//       $(flipbookRef.current).turn(options);
+//       updateDepth($(flipbookRef.current), 1);
+//       adjustViewport();
+//     }
+//   }, [canvasSize]); // Add canvasSize to the dependency array
+
+//   return (
+//     <PhotoModalStyled show={show} onHide={handleClose} size="xl" backdrop="static">
+//       <PhotoModalHeader>
+//         <FlexBox grow={1} justify="center">
+//           <BodyText fontsize="20px" fontweight="600" textcolor="#232323" ml="80px">Preview</BodyText>
+//         </FlexBox>
+//       </PhotoModalHeader>
+//       <PhotoModalBody>
+//         <Box className="modal-body-main-content" style={{ paddingTop: '0px' }}>
+//           <div className="flipbook-viewport">
+
+//             <div className="container">
+//               <div ignore="1" className="left-depth"></div>
+//               <div ref={flipbookRef} className="flipbook" onClick={handleTap}>
+
+//                 {AllPages.map((activePage, index) => {
+//                   const sortedObjects = getAllObjectsSortedByZIndexByPageIndex(activePage, index);
+//                   return (
+
+//                     <PhotoBookPreivewPages
+//                       key={activePage.id}
+//                       data={activePage.id}
+//                       index={index}
+//                       activePage={activePage}
+//                       sortedObjects={sortedObjects}
+//                       totalPages={AllPages.length}
+//                       flipbookRef={flipbookRef}
+//                     />
+
+//                   );
+//                 })}
+//               </div>
+//               <div ignore="1" className="right-depth"></div>
+//             </div>
+//           </div>
+//           <div className="flipbook-footer">
+//             <div className="spread-controls">
+//               <div style={{ display: "inline", marginRight: "120px" }}>
+//                 <span id="prev" className="icon-large icon-angle-left" onClick={handlePrev}>
+//                   <img src={previmage} style={{ width: "25px", height: "25px" }} alt="Previous" />
+//                 </span>
+//                 <span id="next" className="icon-large icon-angle-right" onClick={handleNext}>
+//                   <img src={nextimage} style={{ width: "25px", height: "25px" }} alt="Next" />
+//                 </span>
+//               </div>
+//             </div>
+//           </div>
+//         </Box>
+//       </PhotoModalBody>
+//     </PhotoModalStyled>
+//   );
+// };

@@ -1,0 +1,46 @@
+name: Release
+
+# Triggers on version tags (e.g. `v1.0.0`). Bump the version, tag, push:
+#   npm version patch && git push --follow-tags
+# Each OS runner builds ITS OWN native installer (you cannot build/sign a mac
+# DMG on Windows), then electron-builder publishes them + latest*.yml to the
+# GitHub Release. electron-updater on installed apps reads that feed.
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write # required to create/upload the GitHub Release
+
+jobs:
+  release:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, macos-latest, ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+
+      # Builds the React renderer + Electron main, then packages + publishes.
+      # `--publish always` uploads to the GitHub Release for the pushed tag.
+      - name: Build & publish
+        run: npm run electron:build && npx electron-builder --publish always
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # --- Code signing (leave unset for unsigned builds) ---
+          # Windows: base64 .pfx + password
+          # CSC_LINK: ${{ secrets.WIN_CSC_LINK }}
+          # CSC_KEY_PASSWORD: ${{ secrets.WIN_CSC_KEY_PASSWORD }}
+          # macOS notarization:
+          # APPLE_ID: ${{ secrets.APPLE_ID }}
+          # APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          # APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}

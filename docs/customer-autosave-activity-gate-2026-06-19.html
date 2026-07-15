@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Customer Auto-Save Activity Gate — Session Notes (2026-06-19)</title>
+<style>
+  :root {
+    --bg:#0f1115; --panel:#171a21; --text:#e6e8ec; --muted:#9aa3b2;
+    --accent:#5b9dff; --accent2:#54d6a0; --border:#262b35; --warn:#ffb454; --code:#0b0d11;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);
+    font:16px/1.65 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}
+  .wrap{max-width:960px;margin:0 auto;padding:48px 24px 96px}
+  h1{font-size:30px;line-height:1.2;margin:0 0 6px}
+  h2{font-size:22px;margin:44px 0 14px;padding-top:14px;border-top:1px solid var(--border)}
+  h3{font-size:18px;margin:26px 0 8px;color:var(--accent)}
+  .sub{color:var(--muted);margin:0 0 28px}
+  blockquote{margin:0 0 24px;padding:12px 18px;background:var(--panel);
+    border-left:3px solid var(--accent);border-radius:6px;color:var(--muted)}
+  code{background:var(--code);padding:2px 6px;border-radius:4px;font-size:.88em;
+    font-family:"SF Mono",ui-monospace,Menlo,Consolas,monospace;color:#d7e2ff}
+  a{color:var(--accent);text-decoration:none;border-bottom:1px solid rgba(91,157,255,.4)}
+  a:hover{border-bottom-color:var(--accent)}
+  .docnav{display:flex;gap:12px;flex-wrap:wrap;margin:0 0 24px}
+  .docnav a{display:inline-flex;align-items:center;gap:8px;padding:10px 16px;border:1px solid var(--border);
+    border-radius:10px;background:var(--panel);font-weight:600;border-bottom:1px solid var(--border)}
+  .docnav a:hover{border-color:var(--accent)}
+  .docnav a.here{border-color:var(--accent2);color:var(--accent2);cursor:default}
+  pre{background:var(--code);border:1px solid var(--border);border-radius:10px;
+    padding:16px 18px;overflow:auto;font-family:"SF Mono",ui-monospace,Menlo,Consolas,monospace;
+    font-size:13px;line-height:1.5;color:#cdd6e6}
+  table{width:100%;border-collapse:collapse;margin:14px 0 24px;font-size:15px}
+  th,td{text-align:left;padding:9px 12px;border:1px solid var(--border);vertical-align:top}
+  th{background:#1d2230}
+  td:first-child{color:var(--accent2)}
+  ul{padding-left:22px}
+  .ok{color:var(--accent2)} .warn{color:var(--warn)} .no{color:#e06c6c}
+  .pill{display:inline-block;font-size:12px;padding:2px 9px;border-radius:20px;
+    background:#1d2230;color:var(--accent2);border:1px solid var(--border);margin-left:8px}
+  footer{margin-top:56px;color:var(--muted);font-size:13px;border-top:1px solid var(--border);padding-top:16px}
+  /* ── visual diagrams ── */
+  .diagram{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:22px;margin:18px 0}
+  .diagram .dtitle{font-weight:700;color:var(--accent);margin-bottom:4px;font-size:16px}
+  .diagram .plain{color:var(--muted);font-size:14px;margin:0 0 16px}
+  .dgrow{display:flex;align-items:center;gap:10px;flex-wrap:wrap;justify-content:center}
+  .dgbox{border:2px solid var(--border);border-radius:10px;background:#11151c;padding:10px 14px;text-align:center;min-width:96px}
+  .dgbox .big{font-weight:700;font-size:15px;color:var(--text)}
+  .dgbox .smol{font-size:12px;color:var(--muted);margin-top:4px;line-height:1.4}
+  .dgbox.accent{border-color:var(--accent)} .dgbox.green{border-color:var(--accent2)} .dgbox.warn{border-color:var(--warn)} .dgbox.bad{border-color:#c0504d}
+  .arrow{color:var(--accent);font-size:26px;font-weight:700;line-height:1}
+  .vs{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  .vs .card{border:2px solid var(--border);border-radius:10px;padding:14px;background:#11151c}
+  .vs .card.bad{border-color:#c0504d} .vs .card.good{border-color:var(--accent2)}
+  .vs h4{margin:0 0 10px;font-size:14px}
+  .vs .smol{font-size:13px;color:var(--muted);line-height:1.5}
+  @media (max-width:640px){.vs{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <h1>Customer Auto-Save Activity Gate</h1>
+  <p class="sub">Session notes — 2026-06-19 · the customer 30-second auto-save no longer fires when nothing was edited. Opening or browsing a project saves nothing; only a real content change re-arms it.</p>
+
+  <nav class="docnav">
+    <a href="architecture.md">🏛️ Architecture →</a>
+    <a href="codebase-analysis.md">🔍 Codebase Analysis →</a>
+    <a href="data-flow-diagram.md">🔀 Data Flow Diagram →</a>
+    <a href="canvas.md">🖌️ Canvas →</a>
+    <a href="interaction.md">✋ Interaction →</a>
+    <a href="photo.md">📷 Photo →</a>
+    <a href="shape.md">🔷 Shape →</a>
+    <a href="sticker.md">⭐ Sticker →</a>
+    <a href="text.md">🔤 Text →</a>
+    <a href="react-native-migration-plan.md">📱 React Native Migration Plan →</a>
+    <a href="upload-pipeline.md">⬆️ Upload Pipeline →</a>
+    <a href="session-2026-06-12-upload-pipeline-rework.md">📝 Session: Upload Pipeline Rework (2026-06-12) →</a>
+    <a href="image-loading-optimization-2026-06-16.html">🖼️ Image Loading Optimization (2026-06-16) →</a>
+    <a href="canvas-interaction-performance-2026-06-16.html">🎯 Canvas Interaction Performance (2026-06-16) →</a>
+    <a href="resize-imperative-performance-2026-06-16.html">📐 Resize Imperative Performance (2026-06-16) →</a>
+    <a href="photobook-full-cover-sync-2026-06-19.html">🅿️ Photobook Full Cover Sync (2026-06-19) →</a>
+    <a href="photos-gallery-order-and-preview-2026-06-19.html">🗂️ Photos Gallery Order &amp; Preview (2026-06-19) →</a>
+    <a class="here">💾 Customer Auto-Save Activity Gate (2026-06-19) — you are here</a>
+    <a href="canvas-rulers-2026-06-24.html">📏 Canvas Rulers (2026-06-24) →</a>
+  </nav>
+  <blockquote>Scope: stop the customer 30s auto-save from firing on a freshly-loaded or merely-browsed project. Implemented entirely in <code>src/layout/Header.jsx</code> — no API, store, or reducer changes.</blockquote>
+
+  <h2>TL;DR</h2>
+  <table>
+    <tr><th>Problem</th><th>Fix</th></tr>
+    <tr><td>The customer auto-save (30s <code>setInterval</code>, gated to <code>USER_TYPES.CUSTOMER</code>) fired <strong>every 30s unconditionally</strong> — even on a freshly-opened project with <strong>zero edits</strong>. No dirty/activity check existed.</td><td>Gate the tick on <strong><code>canvas.present.pages</code> reference change</strong>. Capture a post-load baseline; skip the tick while live <code>pages</code> is the same reference; re-pin the baseline on each successful save.</td></tr>
+    <tr><td>The first idea — gate on "undo history grows" (<code>canvas.past</code>) — would have <span class="warn">still saved while just browsing</span>.</td><td><code>setActiveObject</code> and <code>setPageNumber</code> are <strong>not</strong> history-filtered and don't pass <code>history:false</code>, so selecting an object / flipping a page grows <code>past</code>. <code>present.pages</code> does <strong>not</strong> change on those → it's the correct "real edit" signal.</td></tr>
+    <tr><td>When is "loaded" so the baseline isn't captured mid-load?</td><td>Capture when redux <code>projectSetup.isThemeApplied</code> flips true — the load path dispatches <code>setThemeApplied(true)</code> <strong>after</strong> <code>applyTheme</code> + page-qty adjustment, so <code>present.pages</code> is the settled, unedited state.</td></tr>
+  </table>
+
+  <h2>How it works — at a glance 🎯</h2>
+
+  <div class="diagram">
+    <div class="dtitle">The signal is the raw <code>pages</code> array reference</div>
+    <p class="plain">Immer gives a brand-new <code>state.canvas.present.pages</code> array <strong>only</strong> when an object/page/background is actually mutated. Selection, page navigation, zoom and dragger state mutate <em>other</em> <code>present</code> fields — <code>pages</code> keeps the same reference. So "did <code>pages</code> change since the last save?" == "did the user edit content?".</p>
+    <div class="vs">
+      <div class="card bad">
+        <h4>❌ Before (every 30s tick)</h4>
+        <div class="smol"><code>tick → saveProject()</code><br>└─ <code>POST /saveProject</code> <strong>always</strong><br>…even with no edits</div>
+      </div>
+      <div class="card good">
+        <h4>✅ After (every 30s tick)</h4>
+        <div class="smol"><code>tick → pages === lastSavedPages ?</code><br>├─ yes → <strong>SKIP</strong> (no edit)<br>└─ no &nbsp;→ <code>saveProject()</code>; re-pin baseline</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="diagram">
+    <div class="dtitle">Why not undo history (<code>canvas.past</code>)? It's polluted.</div>
+    <p class="plain"><code>store.jsx</code>'s <code>ignoredCanvasActions</code> has <code>setActiveObject</code> and <code>setPageNumber</code> <strong>commented out</strong>, and their dispatch sites don't pass <code>history:false</code> — so merely clicking an object or changing pages pushes a snapshot onto <code>past</code>. Gating on it would auto-save from pure browsing.</p>
+    <div class="dgrow">
+      <div class="dgbox warn"><div class="big">select / page-nav</div><div class="smol">grows <code>past</code> ✗<br>but <code>pages</code> ref stable ✓</div></div>
+      <span class="arrow">→</span>
+      <div class="dgbox accent"><div class="big">present.pages</div><div class="smol">new ref ONLY on<br>a real content edit</div></div>
+      <span class="arrow">→</span>
+      <div class="dgbox green"><div class="big">accurate gate</div><div class="smol">browse = no save<br>edit = save</div></div>
+    </div>
+    <p class="plain" style="margin-top:14px;text-align:center">The whole <code>present</code> reference changes on <em>every</em> action (selection/zoom too) → too noisy. <code>present.pages</code> is the narrowest field that means "content changed".</p>
+  </div>
+
+  <h2>1. The mechanism — 3 touch-points in <code>Header.jsx</code></h2>
+
+  <h3>1.1 Two refs</h3>
+  <pre>const lastSavedPagesRef = useRef(null);       // pages ref as of last save / baseline
+const autoSaveBaselineSetRef = useRef(false); // capture the baseline exactly once</pre>
+
+  <h3>1.2 Baseline captured once, after load settles</h3>
+  <pre>useEffect(() => {
+  if (autoSaveBaselineSetRef.current) return;
+  if (!projectSetup.isInitialized || !isThemeApplied) return;
+  autoSaveBaselineSetRef.current = true;
+  lastSavedPagesRef.current = store.getState().canvas.present.pages;
+}, [projectSetup.isInitialized, isThemeApplied, store]);</pre>
+  <p><code>isThemeApplied</code> (redux) is the right trigger: the load path dispatches <code>setThemeApplied(true)</code> <strong>after</strong> <code>setupTheme()</code>/<code>applyTheme</code> and after pages are adjusted to the correct quantity, so <code>present.pages</code> is the fully-loaded, unedited array here.</p>
+
+  <h3>1.3 The tick gate + re-pin on save</h3>
+  <pre>// inside the existing 30s setInterval, after the &lt; 30s recency guard:
+if (
+  lastSavedPagesRef.current !== null &&
+  store.getState().canvas.present.pages === lastSavedPagesRef.current
+) {
+  return; // no activity since last save / load → skip
+}</pre>
+  <pre>// inside saveProject(): snapshot at build time, re-pin on success only
+const pagesAtSave = store.getState().canvas.present.pages;
+// …build payload, POST…
+.then(() => { lastSavedPagesRef.current = pagesAtSave; })  // success only</pre>
+  <ul>
+    <li><strong>Snapshot at build time, not resolve time</strong> — edits made <em>while a save is in flight</em> produce a new <code>pages</code> ref, so they stay "dirty" and are picked up by the next tick (not falsely marked saved).</li>
+    <li><strong>Re-pin on success only</strong> — a failed save leaves the ref unchanged → the next tick retries.</li>
+    <li><strong>Manual Save routes through the same <code>saveProject()</code></strong> — so it also re-pins the baseline; a manual save followed by no edits leaves auto-save idle.</li>
+  </ul>
+
+  <h2>2. Why this satisfies the requirement</h2>
+  <table>
+    <tr><th>User action after load</th><th><code>pages</code> ref changes?</th><th>Auto-save fires?</th></tr>
+    <tr><td>Nothing (just viewing)</td><td>no</td><td><span class="no">no</span> ✅</td></tr>
+    <tr><td>Click / select an object</td><td>no (only <code>activeObject*</code>)</td><td><span class="no">no</span> ✅</td></tr>
+    <tr><td>Navigate pages (next/prev)</td><td>no (only <code>activePageIndex</code>/<code>activeSide</code>)</td><td><span class="no">no</span> ✅</td></tr>
+    <tr><td>Zoom / pan</td><td>no (only <code>zoomRatio</code>/dragger)</td><td><span class="no">no</span> ✅</td></tr>
+    <tr><td>Move / add / delete object, edit text, change background</td><td><strong>yes</strong></td><td><span class="ok">yes</span> ✅</td></tr>
+  </table>
+
+  <h2>3. Robustness notes</h2>
+  <ul>
+    <li><strong>300-step undo cap is irrelevant</strong> — we compare <code>present.pages</code>, not <code>past.length</code>. Even at the cap, every real edit still produces a new <code>pages</code> reference.</li>
+    <li><strong>The <code>getAllPages</code> selector copy is NOT used for the signal</strong> — it returns a fresh <code>[...canvas.pages]</code> and recomputes whenever the <code>present</code> slice changes (incl. selection), so it would false-positive. The gate reads the <strong>raw</strong> <code>store.getState().canvas.present.pages</code> directly.</li>
+    <li><strong>Null baseline falls through</strong> — if a tick fires before the baseline is set, the <code>!== null</code> guard means the gate doesn't block and behaviour matches the old unconditional save. In practice the baseline is set well within the first 30s.</li>
+    <li><strong>Other user types unaffected</strong> — the auto-save effect still early-returns for non-customers.</li>
+  </ul>
+
+  <h2>4. Known caveat <span class="pill">by design</span></h2>
+  <p>The save payload also includes fields that live <strong>outside</strong> <code>present.pages</code>: <code>cal_settings</code> (calendar settings), <code>settings</code> (document settings, e.g. full-cover toggle), and <code>smart_text</code> (text-group links). A change to <strong>only</strong> one of those — with no object edit — will <strong>not</strong> trigger an auto-save on its own.</p>
+  <ul>
+    <li><strong>Nothing is lost:</strong> they're persisted on the <strong>next object edit</strong> or any <strong>manual Save</strong> (both read current state at save time).</li>
+    <li><strong>Why not broaden the gate to those refs:</strong> their load-time setup actions (<code>setCanvasSize</code>, <code>setSettings</code>, <code>setCalendarSettings</code>) can fire in a <strong>different order</strong> than <code>setThemeApplied</code>, risking a <span class="warn">false post-load save</span> — exactly the bug we removed. The narrow <code>pages</code> signal is the safe, faithful choice.</li>
+  </ul>
+
+  <h2>5. Files changed</h2>
+  <table>
+    <tr><th>File</th><th>Change</th></tr>
+    <tr><td>src/layout/Header.jsx</td><td>Added <code>lastSavedPagesRef</code> + <code>autoSaveBaselineSetRef</code>; baseline <code>useEffect</code> (on <code>isInitialized</code> + <code>isThemeApplied</code>); activity gate inside the 30s auto-save tick; snapshot <code>pagesAtSave</code> in <code>saveProject</code> and re-pin the baseline in its success <code>.then</code>.</td></tr>
+  </table>
+  <p>No store/reducer/API changes. Debug <code>console.log</code>s used during testing were removed before commit.</p>
+
+  <h2>6. Verification checklist</h2>
+  <ul>
+    <li>Open a project as a <strong>customer</strong>, do nothing → over several minutes, <strong>no</strong> <code>POST /saveProject</code> is sent.</li>
+    <li>Click/select objects and flip pages (no real edit) → still <strong>no</strong> save (the key regression the undo-history approach would have failed).</li>
+    <li>Make any content edit (move/add/delete object, edit text, change background) → next tick sends one save.</li>
+    <li>After a save, idle again → ticks stop saving until the next edit.</li>
+    <li>A manual <strong>Save</strong> followed by no edits → auto-save stays idle.</li>
+    <li>Edit <em>during</em> an in-flight save → the edit is still saved on a later tick (not falsely marked clean).</li>
+    <li>Non-customer user types → unchanged (effect early-returns).</li>
+  </ul>
+
+  <footer>Photo-Editors · customer auto-save activity gate · 2026-06-19</footer>
+
+</div>
+</body>
+</html>

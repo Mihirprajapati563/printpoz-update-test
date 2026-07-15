@@ -1,0 +1,32 @@
+{
+  "layouts": [
+    {
+      "id": "layout_1",
+      "name": "Layout_1",
+      "width": 1000,
+      "height": 1000,
+      "background": {
+        "color": "#ffffff",
+        "image": "",
+        "opacity": 1
+      },
+      "objects": [
+       
+      ]
+    },
+    {
+      "id": "layout_1",
+      "name": "Layout_1",
+      "width": 1000,
+      "height": 1000,
+      "background": {
+        "color": "#ffffff",
+        "image": "",
+        "opacity": 1
+      },
+      "objects": [
+        
+      ]
+    }
+  ]
+}

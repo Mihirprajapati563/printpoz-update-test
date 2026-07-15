@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Canvas Rulers — Session Notes (2026-06-24)</title>
+<style>
+  :root {
+    --bg:#0f1115; --panel:#171a21; --text:#e6e8ec; --muted:#9aa3b2;
+    --accent:#5b9dff; --accent2:#54d6a0; --border:#262b35; --warn:#ffb454; --code:#0b0d11;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);
+    font:16px/1.65 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}
+  .wrap{max-width:960px;margin:0 auto;padding:48px 24px 96px}
+  h1{font-size:30px;line-height:1.2;margin:0 0 6px}
+  h2{font-size:22px;margin:44px 0 14px;padding-top:14px;border-top:1px solid var(--border)}
+  h3{font-size:18px;margin:26px 0 8px;color:var(--accent)}
+  .sub{color:var(--muted);margin:0 0 28px}
+  blockquote{margin:0 0 24px;padding:12px 18px;background:var(--panel);
+    border-left:3px solid var(--accent);border-radius:6px;color:var(--muted)}
+  code{background:var(--code);padding:2px 6px;border-radius:4px;font-size:.88em;
+    font-family:"SF Mono",ui-monospace,Menlo,Consolas,monospace;color:#d7e2ff}
+  a{color:var(--accent);text-decoration:none;border-bottom:1px solid rgba(91,157,255,.4)}
+  a:hover{border-bottom-color:var(--accent)}
+  .docnav{display:flex;gap:12px;flex-wrap:wrap;margin:0 0 24px}
+  .docnav a{display:inline-flex;align-items:center;gap:8px;padding:10px 16px;border:1px solid var(--border);
+    border-radius:10px;background:var(--panel);font-weight:600;border-bottom:1px solid var(--border)}
+  .docnav a:hover{border-color:var(--accent)}
+  .docnav a.here{border-color:var(--accent2);color:var(--accent2);cursor:default}
+  pre{background:var(--code);border:1px solid var(--border);border-radius:10px;
+    padding:16px 18px;overflow:auto;font-family:"SF Mono",ui-monospace,Menlo,Consolas,monospace;
+    font-size:13px;line-height:1.5;color:#cdd6e6}
+  table{width:100%;border-collapse:collapse;margin:14px 0 24px;font-size:15px}
+  th,td{text-align:left;padding:9px 12px;border:1px solid var(--border);vertical-align:top}
+  th{background:#1d2230}
+  td:first-child{color:var(--accent2)}
+  ul{padding-left:22px}
+  .ok{color:var(--accent2)} .warn{color:var(--warn)} .no{color:#e06c6c}
+  .pill{display:inline-block;font-size:12px;padding:2px 9px;border-radius:20px;
+    background:#1d2230;color:var(--accent2);border:1px solid var(--border);margin-left:8px}
+  footer{margin-top:56px;color:var(--muted);font-size:13px;border-top:1px solid var(--border);padding-top:16px}
+  /* ── visual diagrams ── */
+  .diagram{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:22px;margin:18px 0}
+  .diagram .dtitle{font-weight:700;color:var(--accent);margin-bottom:4px;font-size:16px}
+  .diagram .plain{color:var(--muted);font-size:14px;margin:0 0 16px}
+  .dgrow{display:flex;align-items:center;gap:10px;flex-wrap:wrap;justify-content:center}
+  .dgbox{border:2px solid var(--border);border-radius:10px;background:#11151c;padding:10px 14px;text-align:center;min-width:96px}
+  .dgbox .big{font-weight:700;font-size:15px;color:var(--text)}
+  .dgbox .smol{font-size:12px;color:var(--muted);margin-top:4px;line-height:1.4}
+  .dgbox.accent{border-color:var(--accent)} .dgbox.green{border-color:var(--accent2)} .dgbox.warn{border-color:var(--warn)} .dgbox.bad{border-color:#c0504d}
+  .arrow{color:var(--accent);font-size:26px;font-weight:700;line-height:1}
+  .vs{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  .vs .card{border:2px solid var(--border);border-radius:10px;padding:14px;background:#11151c}
+  .vs .card.bad{border-color:#c0504d} .vs .card.good{border-color:var(--accent2)}
+  .vs h4{margin:0 0 10px;font-size:14px}
+  .vs .smol{font-size:13px;color:var(--muted);line-height:1.5}
+  @media (max-width:640px){.vs{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <h1>Canvas Rulers</h1>
+  <p class="sub">Session notes — 2026-06-24 · pro-album-style rulers that hug the top and left canvas edges. Toolbar toggle on/off; a corner-box dialog picks the unit and where <code>0</code> starts. View-only prefs in <code>appSlice</code> + localStorage — never saved into project/theme JSON.</p>
+
+  <nav class="docnav">
+    <a href="architecture.md">🏛️ Architecture →</a>
+    <a href="codebase-analysis.md">🔍 Codebase Analysis →</a>
+    <a href="data-flow-diagram.md">🔀 Data Flow Diagram →</a>
+    <a href="canvas.md">🖌️ Canvas →</a>
+    <a href="interaction.md">✋ Interaction →</a>
+    <a href="photo.md">📷 Photo →</a>
+    <a href="shape.md">🔷 Shape →</a>
+    <a href="sticker.md">⭐ Sticker →</a>
+    <a href="text.md">🔤 Text →</a>
+    <a href="react-native-migration-plan.md">📱 React Native Migration Plan →</a>
+    <a href="upload-pipeline.md">⬆️ Upload Pipeline →</a>
+    <a href="session-2026-06-12-upload-pipeline-rework.md">📝 Session: Upload Pipeline Rework (2026-06-12) →</a>
+    <a href="image-loading-optimization-2026-06-16.html">🖼️ Image Loading Optimization (2026-06-16) →</a>
+    <a href="canvas-interaction-performance-2026-06-16.html">🎯 Canvas Interaction Performance (2026-06-16) →</a>
+    <a href="resize-imperative-performance-2026-06-16.html">📐 Resize Imperative Performance (2026-06-16) →</a>
+    <a href="photobook-full-cover-sync-2026-06-19.html">🅿️ Photobook Full Cover Sync (2026-06-19) →</a>
+    <a href="photos-gallery-order-and-preview-2026-06-19.html">🗂️ Photos Gallery Order &amp; Preview (2026-06-19) →</a>
+    <a href="customer-autosave-activity-gate-2026-06-19.html">💾 Customer Auto-Save Activity Gate (2026-06-19) →</a>
+    <a class="here">📏 Canvas Rulers (2026-06-24) — you are here</a>
+  </nav>
+  <blockquote>Scope: measurement rulers hugging the top + left canvas edges, with a TopActions on/off toggle and a corner-box options dialog (unit + "start from"). State lives in <code>appSlice</code> (<code>showRuler</code>/<code>rulerUnit</code>/<code>rulerOrigin</code>) and is persisted to <code>localStorage</code> — NOT in <code>canvas.present.settings</code>, so it never leaks into saved project/theme JSON.</blockquote>
+
+  <h2>TL;DR</h2>
+  <table>
+    <tr><th>Topic</th><th>Detail</th></tr>
+    <tr><td>What it is</td><td>Figma/Photoshop-style rulers pinned to the <strong>top</strong> and <strong>left</strong> edges of the canvas viewport. A toolbar toggle turns them on/off; a <strong>corner box</strong> opens an options dialog (Unit · "Start from" · Hide ruler).</td></tr>
+    <tr><td>Where the state lives</td><td><code>appSlice</code> — <code>showRuler</code>, <code>rulerUnit</code>, <code>rulerOrigin</code>. Persisted to <code>localStorage</code> (<code>editorShowRuler</code> / <code>editorRulerUnit</code> / <code>editorRulerOrigin</code>). <strong>Deliberately NOT in <code>canvas.present.settings</code></strong> — that slice is serialized into saved project/theme JSON, and a view-only pref must never leak into every saved document. <code>rulerUnit</code> is the ruler's <strong>own</strong> unit, independent of the print-unit pref.</td></tr>
+    <tr><td>Units / origin</td><td>Unit ∈ <code>px</code> / <code>in</code> / <code>cm</code> / <code>mm</code>. Origin (<code>rulerOrigin</code>) ∈ <code>center</code> (default = spine) / <code>start</code> (top-left) / <code>end</code> (bottom-right). The <strong>left</strong> ruler ignores <code>center</code> and treats it as <code>start</code> (no vertical spine).</td></tr>
+    <tr><td>Always-visible bands</td><td>The bands are <strong>fixed at the viewport edges</strong> and measure the canvas's <strong>live on-screen rect</strong> (<code>getBoundingClientRect</code> on <code>#canvasWrapper</code> ÷ its <code>viewBox</code>). They clamp to the viewport so they never scroll off-screen for a huge album or small screen — only the tick <strong>numbers</strong> slide.</td></tr>
+    <tr><td>Gutter reserve</td><td>The canvas is <strong>always</strong> rendered at <code>transform: scale(0.95)</code> (<code>RULER_RESERVE_SCALE</code>) so there's permanent gutter for the bands — applied unconditionally so toggling the ruler never resizes the canvas (no blink).</td></tr>
+    <tr><td><span class="warn">⚠️ Firefox gotcha</span></td><td>The 0.95 reserve MUST be a <code>transform: scale</code>, <strong>not</strong> CSS <code>zoom</code> — Firefox maps <code>zoom</code> differently in <code>getBoundingClientRect</code>, which offset Moveable's selection (object jumped top-right). <code>transform: scale</code> is handled identically by Moveable + <code>getBoundingClientRect</code> in every browser.</td></tr>
+  </table>
+
+  <h2>How it works — at a glance 🎯</h2>
+
+  <div class="diagram">
+    <div class="dtitle">Bands hug the canvas, but clamp to the viewport</div>
+    <p class="plain">The top band spans the canvas width and sits just above it; the left band spans the canvas height and sits just left of it. Both are positioned from the canvas's live on-screen rect, and their thickness-axis position is <strong>clamped</strong> so they "stick" at the viewport edge instead of scrolling off-screen when the canvas overflows.</p>
+    <div class="dgrow">
+      <div class="dgbox accent"><div class="big">#canvasWrapper rect</div><div class="smol">getBoundingClientRect<br>÷ viewBox</div></div>
+      <span class="arrow">→</span>
+      <div class="dgbox"><div class="big">band geometry</div><div class="smol">hug edge,<br>clampPos to viewport</div></div>
+      <span class="arrow">→</span>
+      <div class="dgbox green"><div class="big">always visible</div><div class="smol">numbers slide,<br>marks stay correct</div></div>
+    </div>
+  </div>
+
+  <div class="diagram">
+    <div class="dtitle">The 0.95 gutter reserve: <code>transform</code>, NOT <code>zoom</code></div>
+    <p class="plain">The canvas is permanently shrunk ~5% to leave gutter for the bands (always-on → toggling causes no blink). It must be applied with a CSS <code>transform: scale</code>.</p>
+    <div class="vs">
+      <div class="card bad">
+        <h4>❌ <code>zoom: 0.95</code> (folded into page zoom)</h4>
+        <div class="smol">Firefox maps CSS <code>zoom</code> differently inside <code>getBoundingClientRect</code> → Moveable's selection box was offset (object jumped top-right).</div>
+      </div>
+      <div class="card good">
+        <h4>✅ <code>transform: scale(0.95)</code></h4>
+        <div class="smol">Handled identically by Moveable + <code>getBoundingClientRect</code> in every browser; selection stays aligned. Centered <code>transform-origin</code> → canvas never goes off-screen.</div>
+      </div>
+    </div>
+  </div>
+
+  <h2>1. State — <code>appSlice</code> (not <code>canvas.settings</code>), persisted to <code>localStorage</code></h2>
+  <p><code>src/store/slices/appAlice.js</code> owns three fields + three actions:</p>
+  <pre>// initial state
+showRuler:   readShowRuler(),   // localStorage "editorShowRuler"  → boolean (default false)
+rulerUnit:   readRulerUnit(),   // localStorage "editorRulerUnit"  → "px"|"in"|"cm"|"mm" (default "px")
+rulerOrigin: readRulerOrigin(), // localStorage "editorRulerOrigin"→ "center"|"start"|"end" (default "center")
+
+// actions (each validates + writes through to localStorage)
+setShowRuler(boolean)
+setRulerUnit("px"|"in"|"cm"|"mm")      // falls back to "px" on bad input
+setRulerOrigin("center"|"start"|"end") // falls back to "center" on bad input</pre>
+  <ul>
+    <li><strong>Why <code>appSlice</code>, not <code>canvas.present.settings</code>:</strong> <code>settings</code> is serialized into saved project/theme JSON (via <code>Header.jsx getDataToSave</code>). Ruler visibility is a pure <strong>view preference</strong> — keeping it in <code>appSlice</code> + <code>localStorage</code> means it survives reloads and <strong>carries across projects</strong> without polluting any saved document. Same rationale as <code>layoutMode</code>.</li>
+    <li><strong><code>rulerUnit</code> is independent</strong> of the print/document unit preference (<code>getPreferredUnit()</code>); the ruler measures in whatever unit the user picks in the corner dialog.</li>
+    <li>Each setter is defensive: it validates against the allowed list and silently no-ops the <code>localStorage</code> write if storage is unavailable.</li>
+  </ul>
+
+  <h2>2. The toggle — <code>RulerControl.jsx</code> (top toolbar)</h2>
+  <p><code>src/layout/RulerControl.jsx</code> is an <code>IconButton</code> rendered inside an <code>ActionWrapperBox</code> in <strong>TopActions</strong>, so it matches the other toolbar buttons.</p>
+  <ul>
+    <li>Uses the toolbar's <code>.active</code> convention: when <code>showRuler</code> is true it gets <code>className="active"</code> (light-blue tint) and the icon/label switch to <code>var(--primary)</code>.</li>
+    <li><code>role="switch"</code> + <code>aria-checked={showRuler}</code> for accessibility; title flips between "Show ruler" / "Hide ruler".</li>
+    <li><strong>On/off only</strong> — the unit and origin options deliberately live in the ruler's <strong>own corner dialog</strong>, not in the toolbar and not in the Settings tab (matches how a pro editor exposes ruler options at the corner intersection).</li>
+  </ul>
+
+  <h2>3. The ruler component — <code>CanvasRulers.jsx</code></h2>
+  <p>Rendered once inside <code>Canvas.jsx</code>'s outer <code>.CanvasWrapper</code> (the canvas viewport, <code>position: relative</code>); self-gated by <code>showRuler</code>.</p>
+
+  <h3>3.1 Always-visible bands measured from the live rect</h3>
+  <p><code>measure()</code> reads the canvas's live on-screen geometry and stores it in <code>geom</code>:</p>
+  <pre>const cRect = root.getBoundingClientRect();        // the .CanvasWrapper viewport
+const sRect = svg.getBoundingClientRect();         // #canvasWrapper &lt;svg&gt;
+geom = {
+  rootW, rootH,                                    // viewport size
+  left: sRect.left - cRect.left, top: sRect.top - cRect.top, // canvas offset in viewport
+  width: sRect.width, height: sRect.height,        // canvas on-screen size
+  vbW: svg.viewBox.baseVal.width,                  // canvas-units (for in/cm/mm)
+  vbH: svg.viewBox.baseVal.height,
+};</pre>
+  <ul>
+    <li><code>screenPerCanvasX = geom.width / geom.vbW</code> converts canvas units → on-screen px, so <strong>cm/in marks stay physically correct</strong> at any zoom (rect ÷ viewBox), and <code>dpi = canvasSize.dpi || 200</code> feeds the unit conversion.</li>
+    <li>The bands span the canvas extent and <strong>hug</strong> its edges (<code>top - THICK - GAP</code>, <code>left - THICK - GAP</code>), but the thickness-axis position is run through <code>clampPos(v, max)</code> so a band <strong>sticks at the viewport edge</strong> instead of scrolling off-screen when the canvas is larger than the viewport (huge album) or the screen is small. Only the tick numbers slide.</li>
+  </ul>
+
+  <h3>3.2 Origin (where <code>0</code> sits)</h3>
+  <pre>// top ruler honours center/start/end
+const origin0X = origin === "start" ? 0 : origin === "end" ? geom.width : geom.width / 2;
+// left ruler IGNORES "center" — no vertical spine; center behaves like start
+const origin0Y = origin === "end" ? geom.height : 0;</pre>
+  <p>Ticks are built outward from the origin in both directions; labels are <code>Math.abs(k * step)</code> so they count up on either side of a centered <code>0</code>.</p>
+
+  <h3>3.3 Adaptive tick density + memoization</h3>
+  <ul>
+    <li>A "nice-step" ladder (<code>PX_LADDER</code> / <code>UNIT_LADDER</code>) keeps <strong>labelled ticks ≥ 56px apart</strong> (<code>MIN_MAJOR</code>) so node count stays bounded at any zoom; minors below <code>MIN_MINOR</code> (6px) are dropped. Three tick levels: major / mid / minor.</li>
+    <li>Tick geometry is <code>useMemo</code>'d on <code>[geom, unit, origin, canvasSize.dpi]</code>; <code>measure()</code> is <strong>rAF-throttled</strong> (<code>schedule()</code>).</li>
+  </ul>
+
+  <h3>3.4 Re-measure triggers</h3>
+  <p>A <code>ResizeObserver</code> watches the <code>#canvasWrapper</code> svg <strong>and</strong> the root <strong>and</strong> <code>.pages-outer</code> (the animated padding shift when the ruler toggles on is a position change with no svg-size change — the <code>.pages-outer</code> content-box shrinks through the transition, so observing it keeps the bands following the canvas to rest). Plus a <code>scroll</code> listener on <code>.pages-outer</code>, <code>window resize</code>, two belt-and-suspenders <code>setTimeout</code>s (120ms / 420ms), and effect deps <code>pageIndex / zoomRatio / canvasScale / canvasSize</code> (a <code>pageIndex</code> change re-acquires the remounted svg).</p>
+
+  <h3>3.5 Corner dialog</h3>
+  <p>Clicking the corner box toggles <code>.canvas-ruler-menu</code> — a small popover with the <strong>Unit</strong> segmented control, the <strong>"Start from"</strong> segmented control, and a <strong>Hide ruler</strong> button (dispatches <code>setShowRuler(false)</code>). Closes on outside-click / Escape. Because the whole overlay renders at <strong>viewport scale</strong> (outside the canvas zoom), it's a normal-sized, crisp UI regardless of zoom.</p>
+
+  <h3>3.6 Guarantees</h3>
+  <ul>
+    <li>Root has <code>pointerEvents: none</code> (the corner button + dialog opt back in with <code>pointerEvents: auto</code>), so the bands never intercept canvas clicks.</li>
+    <li><code>className="not-exportable"</code> keeps the rulers out of any export/capture.</li>
+    <li>The root <code>&lt;div&gt;</code> always mounts (guarded only on <code>showRuler</code>, not on <code>geom</code>) so <code>rootRef</code> is set and <code>measure()</code> can populate <code>geom</code> — guarding on <code>geom</code> would mean it never becomes visible.</li>
+  </ul>
+
+  <h2>4. Canvas integration &amp; the Firefox gotcha — <code>Canvas.jsx</code></h2>
+  <pre>// rendered in the outer .CanvasWrapper, self-gated by showRuler
+&lt;CanvasRulers /&gt;</pre>
+  <pre>const RULER_RESERVE_SCALE = 0.95; // permanent gutter for the rulers
+// …on the .canvas-box style:
+zoom: canvasScale * (…),                     // existing page zoom
+transform: `scale(${RULER_RESERVE_SCALE})`,  // the ruler gutter reserve
+transformOrigin: "center center",</pre>
+  <ul>
+    <li>The ~5% gutter is reserved <strong>unconditionally</strong> (always-on), so toggling the ruler never resizes the canvas → <strong>no blink</strong> on toggle. Centered transform-origin shrinks the canvas toward its middle so it never goes off-screen.</li>
+    <li><span class="warn">⚠️ It MUST be <code>transform: scale</code>, NOT <code>zoom</code>.</span> Folding the 0.95 into the existing <code>zoom</code> broke Moveable's selection in <strong>Firefox</strong>: Firefox maps CSS <code>zoom</code> differently inside <code>getBoundingClientRect</code>, which offset Moveable's selection box (the object jumped to the top-right). A <code>transform: scale</code> is handled identically by Moveable + <code>getBoundingClientRect</code> in every browser, so the selection stays aligned. Do not collapse the reserve back into <code>zoom</code>.</li>
+  </ul>
+
+  <h2>5. Files changed</h2>
+  <table>
+    <tr><th>File</th><th>Change</th></tr>
+    <tr><td>src/store/slices/appAlice.js</td><td>Added <code>showRuler</code> / <code>rulerUnit</code> / <code>rulerOrigin</code> to initial state (read from <code>localStorage</code> via <code>readShowRuler</code>/<code>readRulerUnit</code>/<code>readRulerOrigin</code>) + <code>setShowRuler</code> / <code>setRulerUnit</code> / <code>setRulerOrigin</code> reducers (validate + write through to <code>localStorage</code> keys <code>editorShowRuler</code> / <code>editorRulerUnit</code> / <code>editorRulerOrigin</code>).</td></tr>
+    <tr><td>src/layout/RulerControl.jsx</td><td>New on/off toggle <code>IconButton</code> for TopActions (uses <code>.active</code> convention, <code>role="switch"</code>); drives <code>setShowRuler</code>.</td></tr>
+    <tr><td>src/components/canvas/CanvasRulers.jsx</td><td>New viewport-anchored ruler overlay: measures <code>#canvasWrapper</code> rect ÷ viewBox, clamps bands to viewport, adaptive tick ladder, corner options dialog (unit + origin + hide).</td></tr>
+    <tr><td>src/components/canvas/Canvas.jsx</td><td>Renders <code>&lt;CanvasRulers /&gt;</code> in the outer <code>.CanvasWrapper</code>; adds the <code>RULER_RESERVE_SCALE = 0.95</code> <code>transform: scale</code> gutter on <code>.canvas-box</code> (NOT <code>zoom</code> — Firefox/Moveable alignment).</td></tr>
+    <tr><td>src/layout/TopActions.jsx</td><td>Mounts <code>RulerControl</code> inside an <code>ActionWrapperBox</code>.</td></tr>
+  </table>
+
+  <h2>6. Verification checklist</h2>
+  <ul>
+    <li>Toggle the <strong>Ruler</strong> button in TopActions → bands appear/disappear at the top + left canvas edges; button shows the <code>.active</code> (primary) state when on.</li>
+    <li>Toggling on/off does <strong>not</strong> resize or jiggle the canvas (the 0.95 gutter is permanent).</li>
+    <li>Click the <strong>corner box</strong> → options dialog opens; change <strong>Unit</strong> (px/in/cm/mm) → tick labels switch units and stay physically correct; outside-click / Escape closes it.</li>
+    <li>Change <strong>"Start from"</strong> Center / Start / End → top ruler's <code>0</code> moves to center / left / right; the <strong>left</strong> ruler treats Center as Start (0 at top), and End flips it to the bottom.</li>
+    <li>Zoom in until the canvas overflows the viewport → bands <strong>stay visible</strong> (clamped to the viewport edges); only the numbers slide. Scroll <code>.pages-outer</code> → bands follow the canvas edge.</li>
+    <li>Reload the page → <code>showRuler</code> / unit / origin persist (localStorage); open a <strong>different project</strong> → the same ruler prefs carry over.</li>
+    <li>Save a project / save as theme → the saved JSON contains <strong>no</strong> ruler fields (they live in <code>appSlice</code>, not <code>canvas.settings</code>).</li>
+    <li><strong>Firefox specifically:</strong> select/move an object with the ruler on → Moveable's selection box stays aligned with the object (no top-right jump). This is the reason the reserve is <code>transform</code>, not <code>zoom</code>.</li>
+    <li>Export → rulers do not appear in the output (<code>not-exportable</code>).</li>
+  </ul>
+
+  <footer>Photo-Editors · canvas rulers · 2026-06-24</footer>
+
+</div>
+</body>
+</html>

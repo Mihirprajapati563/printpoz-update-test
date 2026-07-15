@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Canvas Interaction Performance — Session Notes (2026-06-16)</title>
+<style>
+  :root {
+    --bg:#0f1115; --panel:#171a21; --text:#e6e8ec; --muted:#9aa3b2;
+    --accent:#5b9dff; --accent2:#54d6a0; --border:#262b35; --warn:#ffb454; --code:#0b0d11;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);
+    font:16px/1.65 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}
+  .wrap{max-width:960px;margin:0 auto;padding:48px 24px 96px}
+  h1{font-size:30px;line-height:1.2;margin:0 0 6px}
+  h2{font-size:22px;margin:44px 0 14px;padding-top:14px;border-top:1px solid var(--border)}
+  h3{font-size:18px;margin:26px 0 8px;color:var(--accent)}
+  .sub{color:var(--muted);margin:0 0 28px}
+  blockquote{margin:0 0 24px;padding:12px 18px;background:var(--panel);
+    border-left:3px solid var(--accent);border-radius:6px;color:var(--muted)}
+  code{background:var(--code);padding:2px 6px;border-radius:4px;font-size:.88em;
+    font-family:"SF Mono",ui-monospace,Menlo,Consolas,monospace;color:#d7e2ff}
+  a{color:var(--accent);text-decoration:none;border-bottom:1px solid rgba(91,157,255,.4)}
+  a:hover{border-bottom-color:var(--accent)}
+  .docnav{display:flex;gap:12px;flex-wrap:wrap;margin:0 0 24px}
+  .docnav a{display:inline-flex;align-items:center;gap:8px;padding:10px 16px;border:1px solid var(--border);
+    border-radius:10px;background:var(--panel);font-weight:600;border-bottom:1px solid var(--border)}
+  .docnav a:hover{border-color:var(--accent)}
+  .docnav a.here{border-color:var(--accent2);color:var(--accent2);cursor:default}
+  pre{background:var(--code);border:1px solid var(--border);border-radius:10px;
+    padding:16px 18px;overflow:auto;font-family:"SF Mono",ui-monospace,Menlo,Consolas,monospace;
+    font-size:13px;line-height:1.5;color:#cdd6e6}
+  table{width:100%;border-collapse:collapse;margin:14px 0 24px;font-size:15px}
+  th,td{text-align:left;padding:9px 12px;border:1px solid var(--border);vertical-align:top}
+  th{background:#1d2230}
+  td:first-child{color:var(--accent2)}
+  ul{padding-left:22px}
+  .ok{color:var(--accent2)} .warn{color:var(--warn)}
+  .pill{display:inline-block;font-size:12px;padding:2px 9px;border-radius:20px;
+    background:#1d2230;color:var(--accent2);border:1px solid var(--border);margin-left:8px}
+  footer{margin-top:56px;color:var(--muted);font-size:13px;border-top:1px solid var(--border);padding-top:16px}
+  /* ── visual diagrams ── */
+  .diagram{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:22px;margin:18px 0}
+  .diagram .dtitle{font-weight:700;color:var(--accent);margin-bottom:4px;font-size:16px}
+  .diagram .plain{color:var(--muted);font-size:14px;margin:0 0 16px}
+  .dgrow{display:flex;align-items:center;gap:10px;flex-wrap:wrap;justify-content:center}
+  .dgbox{border:2px solid var(--border);border-radius:10px;background:#11151c;padding:10px 14px;text-align:center;min-width:96px}
+  .dgbox .big{font-weight:700;font-size:15px;color:var(--text)}
+  .dgbox .smol{font-size:12px;color:var(--muted);margin-top:4px;line-height:1.4}
+  .dgbox.accent{border-color:var(--accent)} .dgbox.green{border-color:var(--accent2)} .dgbox.warn{border-color:var(--warn)} .dgbox.bad{border-color:#c0504d}
+  .arrow{color:var(--accent);font-size:26px;font-weight:700;line-height:1}
+  .vs{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  .vs .card{border:2px solid var(--border);border-radius:10px;padding:14px;background:#11151c}
+  .vs .card.bad{border-color:#c0504d} .vs .card.good{border-color:var(--accent2)}
+  .vs h4{margin:0 0 10px;font-size:14px}
+  .vs .smol{font-size:13px;color:var(--muted);line-height:1.5}
+  .grid9{display:grid;grid-template-columns:repeat(6,1fr);gap:6px;max-width:260px;margin:10px auto 0}
+  .cell{aspect-ratio:1;border-radius:5px;border:1px solid var(--border);background:#11151c}
+  .cell.on{background:#c0504d;border-color:#e88}
+  .cell.one{background:var(--accent2);border-color:var(--accent2)}
+  @media (max-width:640px){.vs{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <h1>Canvas Interaction Performance</h1>
+  <p class="sub">Session notes — 2026-06-16 · smooth object drag/rotate/resize &amp; inner-image zoom/pan at 60fps (even at 4× CPU throttle), without breaking the footer live preview, undo, or export.</p>
+
+  <nav class="docnav">
+    <a href="architecture.md">🏛️ Architecture →</a>
+    <a href="codebase-analysis.md">🔍 Codebase Analysis →</a>
+    <a href="data-flow-diagram.md">🔀 Data Flow Diagram →</a>
+    <a href="canvas.md">🖌️ Canvas →</a>
+    <a href="interaction.md">✋ Interaction →</a>
+    <a href="photo.md">📷 Photo →</a>
+    <a href="shape.md">🔷 Shape →</a>
+    <a href="sticker.md">⭐ Sticker →</a>
+    <a href="text.md">🔤 Text →</a>
+    <a href="react-native-migration-plan.md">📱 React Native Migration Plan →</a>
+    <a href="upload-pipeline.md">⬆️ Upload Pipeline →</a>
+    <a href="session-2026-06-12-upload-pipeline-rework.md">📝 Session: Upload Pipeline Rework (2026-06-12) →</a>
+    <a href="image-loading-optimization-2026-06-16.html">🖼️ Image Loading Optimization (2026-06-16) →</a>
+    <a class="here">🎯 Canvas Interaction Performance (2026-06-16) — you are here</a>
+    <a href="resize-imperative-performance-2026-06-16.html">📐 Resize Imperative Performance (2026-06-16) →</a>
+    <a href="photobook-full-cover-sync-2026-06-19.html">🅿️ Photobook Full Cover Sync (2026-06-19) →</a>
+    <a href="photos-gallery-order-and-preview-2026-06-19.html">🗂️ Photos Gallery Order &amp; Preview (2026-06-19) →</a>
+    <a href="customer-autosave-activity-gate-2026-06-19.html">💾 Customer Auto-Save Activity Gate (2026-06-19) →</a>
+    <a href="canvas-rulers-2026-06-24.html">📏 Canvas Rulers (2026-06-24) →</a>
+  </nav>
+  <blockquote>Companion to <a href="image-loading-optimization-2026-06-16.html">Image Loading Optimization</a> (image <em>loading</em>). This doc covers <em>interaction/rendering</em>.</blockquote>
+
+  <h2>TL;DR</h2>
+  <table>
+    <tr><th>Problem</th><th>Fix</th></tr>
+    <tr><td>Every drag/zoom frame re-rendered <strong>all ~30 objects</strong></td><td>Selector returns <strong>stable item identities</strong> (WeakMap) + memoize all object components → only the changed object re-renders</td></tr>
+    <tr><td>Canvas zoomed by changing <code>&lt;img&gt;</code> width/height → <strong>re-raster every frame</strong></td><td>Zoom via <strong>GPU <code>transform: scale()</code></strong> on a fixed-size image</td></tr>
+    <tr><td><code>MainCanvas</code> re-rendered <strong>~60×/sec</strong> during any gesture</td><td>Drag/rotate/zoom/pan are <strong>imperative</strong> (no per-frame dispatch); commit once on gesture end</td></tr>
+    <tr><td>Footer live preview <strong>froze</strong> during imperative gestures</td><td>Mirror the gesture to footer DOM copies (<code>applyLiveImageTransform</code>, <code>applyLiveObjectTransform</code>)</td></tr>
+    <tr><td>Selection box stopped tracking / stayed oversized</td><td>rAF <code>updateRect()</code> loop while panning + re-measure on pan end</td></tr>
+    <tr><td>Zoom-after-undo <strong>jumped back</strong> to old scale</td><td>Read zoom base from the <strong>live object</strong> (reverts on undo), not preserved <code>activeObjectprops</code></td></tr>
+    <tr><td>Inner pan/zoom <strong>re-scanned the whole DOM</strong> (<code>querySelectorAll</code>) every frame</td><td>Query the <code>&lt;img&gt;</code>/Ghost targets <strong>once at gesture start</strong>, cache, reuse each frame</td></tr>
+  </table>
+
+  <h2>How it works — at a glance 🎯</h2>
+
+  <div class="diagram">
+    <div class="dtitle">① The lag: moving ONE object repainted ALL of them</div>
+    <p class="plain">Imagine a classroom where the teacher asks <em>one</em> kid a question, but the <em>whole class</em> has to stand up and sit down. That's what was happening: drag one photo, and all ~30 objects on the page re-rendered 60 times a second.</p>
+    <div class="vs">
+      <div class="card bad">
+        <h4>❌ Before — everyone re-renders</h4>
+        <div class="grid9">
+          <span class="cell on"></span><span class="cell on"></span><span class="cell on"></span><span class="cell on"></span><span class="cell on"></span><span class="cell on"></span>
+          <span class="cell on"></span><span class="cell on"></span><span class="cell on"></span><span class="cell on"></span><span class="cell on"></span><span class="cell on"></span>
+          <span class="cell on"></span><span class="cell on"></span><span class="cell on"></span><span class="cell on"></span><span class="cell on"></span><span class="cell on"></span>
+        </div>
+        <p class="smol" style="text-align:center;margin-top:10px">🔴 every object repaints — slow</p>
+      </div>
+      <div class="card good">
+        <h4>✅ After — only the one you touched</h4>
+        <div class="grid9">
+          <span class="cell"></span><span class="cell"></span><span class="cell"></span><span class="cell"></span><span class="cell"></span><span class="cell"></span>
+          <span class="cell"></span><span class="cell"></span><span class="cell one"></span><span class="cell"></span><span class="cell"></span><span class="cell"></span>
+          <span class="cell"></span><span class="cell"></span><span class="cell"></span><span class="cell"></span><span class="cell"></span><span class="cell"></span>
+        </div>
+        <p class="smol" style="text-align:center;margin-top:10px">🟢 only the dragged one repaints — fast</p>
+      </div>
+    </div>
+    <p class="plain" style="margin:14px 0 0">The trick: give every object a <b>stable "name tag"</b> (a WeakMap) so React can tell <em>"this one didn't change, skip it."</em></p>
+  </div>
+
+  <div class="diagram">
+    <div class="dtitle">② How a drag works now: move first, save once</div>
+    <p class="plain">Before, every wiggle of the mouse was written to the "save file" (Redux) — and writing the save file is what woke up the whole heavy canvas. Now we move the picture <em>directly</em> on screen and only write the save file <b>once</b>, when you let go.</p>
+    <div class="dgrow">
+      <div class="dgbox green"><div class="big">🖱️ you drag</div><div class="smol">picture moves on screen<br>(direct / instant)</div></div>
+      <span class="arrow">›</span>
+      <div class="dgbox accent"><div class="big">…still dragging</div><div class="smol">NO save-file writes<br>→ canvas stays calm</div></div>
+      <span class="arrow">›</span>
+      <div class="dgbox warn"><div class="big">🖐️ you let go</div><div class="smol">save ONCE<br>(undo works)</div></div>
+    </div>
+  </div>
+
+  <div class="diagram">
+    <div class="dtitle">③ But the footer is a "mirror" — keep it in sync</div>
+    <p class="plain">The little page thumbnails at the bottom show the <em>same</em> objects. Since we stopped writing the save file mid-drag, the footer wouldn't know to move. So during a drag we <b>also nudge the footer's copy directly</b> — both move together, still no save-file writes.</p>
+    <div class="dgrow">
+      <div class="dgbox accent"><div class="big">🖼️ Main canvas</div><div class="smol">moved by the drag</div></div>
+      <span class="arrow">⇄</span>
+      <div class="dgbox green"><div class="big">🔻 Footer thumbnail</div><div class="smol">nudged to match<br>(same <code>data-id</code>)</div></div>
+    </div>
+    <p class="plain" style="margin:14px 0 0">Same idea for the blue <b>selection box</b>: a tiny loop keeps re-measuring it each frame so it follows the photo, then snaps back when you let go.</p>
+  </div>
+
+  <h2>1. The problem</h2>
+  <p>At 4× CPU throttle the main canvas stuttered during interaction while the sidebar/footer did not. The cost was <strong>re-render fan-out and per-frame work</strong>, not raster:</p>
+  <ul>
+    <li>One interaction frame → one redux dispatch → <code>MainCanvas</code> (~3900 lines) re-renders → its N-object <code>.map</code> runs → <strong>every object re-renders</strong> (memo defeated).</li>
+    <li>Inner-image zoom changed <code>&lt;img&gt;</code> width/height → browser <strong>re-rasterized the full-res bitmap every frame</strong>.</li>
+    <li><code>MainCanvas</code> re-rendered <strong>~60×/sec</strong> during any gesture.</li>
+  </ul>
+
+  <h2>2. Root causes &amp; fixes</h2>
+
+  <h3>2.1 Re-render fan-out → stable identities + memoization</h3>
+  <p><code>getAllObjectsSortedByZIndex</code> spread-copied every object (<code>{...obj}</code>) each recompute → every <code>item</code> was a new reference → <code>React.memo</code> failed (and <code>Text</code> wasn't memoized) → all N objects re-rendered. Now the selector wraps each object through a <strong>WeakMap</strong> keyed by the underlying object; Immer keeps unchanged objects' identity, so they reuse the same wrapped reference → memo holds → <strong>only the changed object re-renders</strong>.</p>
+  <pre>BEFORE (per drag frame)                AFTER (per drag frame)
+ dispatch                               dispatch
+   └─ getAllObjects (new array,           └─ getAllObjects (WeakMap reuse:
+       {...obj} → ALL new refs)               only changed obj is a new ref)
+        └─ MainCanvas re-render                └─ MainCanvas re-render
+             └─ Photo×30 re-render  ✗               └─ Photo×1 re-render  ✓
+                Text×N re-render  ✗                    (others memo-bail)</pre>
+
+  <h3>2.2 Full-res raster on zoom → GPU transform</h3>
+  <p>The canvas sized the image with <code>width = image.width * scale</code>; changing that re-rasters the bitmap every frame. Now the image renders at <strong>fixed intrinsic size</strong> and zoom is <code>transform: translate(pos) scale(scale)</code> (<code>transformOrigin: 0 0</code>) → decoded once, GPU samples the texture. Clip/mask/flip are frame-space and unaffected.</p>
+
+  <h3>2.3 Per-frame redux dispatch → imperative gestures</h3>
+  <p>react-moveable already moves the element imperatively (<code>cssText</code>), and the image uses a GPU transform — so the per-frame dispatch is redundant for the visual; its only job is persistence. Drag/rotate/zoom/pan dispatch <strong>nothing</strong> per frame and commit once on gesture end. <code>MainCanvas</code> commits during a gesture drop from <strong>~60/sec → ~0</strong>. (Resize keeps dispatching — its size visual comes from redux width/height.)</p>
+
+  <h3>2.4 Imperative gestures broke the footer → mirror to footer DOM</h3>
+  <p>The footer reads positions/sizes from redux, so imperative gestures froze it. Helpers in <code>progressiveImage.js</code> mirror the gesture to the off-canvas DOM copies (footer renders the same objects with the same <code>data-id</code>/<code>data-id-t</code>):</p>
+  <ul>
+    <li><code>applyLiveImageTransform(id, image, canvasRootEl)</code> — inner zoom/pan (canvas <code>&lt;img&gt;</code> transform; footer <code>&lt;img&gt;</code> margin + scaled size).</li>
+    <li><code>applyLiveObjectTransform(id, x, y, rotation, canvasRootEl)</code> — object drag/rotate (both <code>&lt;g class="page-item" data-id-t&gt;</code>).</li>
+  </ul>
+  <p><code>canvasRootEl</code> (main <code>&lt;svg&gt;</code>) is passed so the canvas copy is <strong>skipped</strong>. No redux → no <code>MainCanvas</code> re-render → footer stays live.</p>
+
+  <h3>2.5 Selection box tracking during imperative pan</h3>
+  <p>The moveable box re-measured when <code>activeObjectprops</code> changed (every frame via the old dispatch); imperative pan stopped that → the box froze. Fix: a <strong>rAF loop</strong> calls <code>updateRect()</code> every frame while <code>isDragger</code> is true, and on pan end (incl. a bare pan-handle <strong>click</strong> that briefly shows the box-expanding GhostImage) it re-measures so the box snaps back instead of staying oversized.</p>
+
+  <h3>2.6 Zoom-after-undo jump</h3>
+  <p>The undo wrapper <strong>preserves <code>activeObjectprops</code></strong> across Ctrl+Z, so it kept the last-zoomed scale even after the object reverted. The zoom base now reads from the <strong>live object</strong> (<code>activeObjImageRef</code>, synced from <code>allObjects</code> + <code>activeObject</code>) → re-zoom starts from the reverted scale.</p>
+
+  <h3>2.7 Per-frame DOM query during inner pan/zoom → cache the targets</h3>
+  <p>The footer mirror (§2.4) finds an image's on-screen <code>&lt;img&gt;</code> elements with <code>document.querySelectorAll(...)</code>. The first version called that <strong>every frame</strong> of a pan/zoom — pan twice (images + GhostImage), zoom once — and the scan walks the <em>whole</em> DOM, including <strong>every footer thumbnail</strong>. That per-frame scan was a residual "little lag."</p>
+  <p>The gesture is imperative (no re-render), so those elements <strong>don't change</strong> mid-gesture — no reason to re-find them. The helper is split into <strong>query-once</strong> + <strong>apply-to-cached</strong>: <code>queryLiveImageEls(id)</code> runs the scan once; <code>applyLiveImageTransformEls(els, image, canvasRootEl)</code> applies to the cached elements; <code>applyLiveImageTransform(id, …)</code> stays as a convenience for non-hot callers. <strong>Pan</strong> (<code>Photo.jsx</code>) caches <code>{ imgEls, ghostEl }</code> in <code>panElsRef</code> on the first frame and clears on mouse-up; <strong>zoom</strong> (<code>Canvas.jsx</code>) caches <code>zoomImgElsRef</code> per wheel session and clears on commit. Net: <strong>N DOM scans per gesture → 1.</strong> Pure DOM-lookup change — same elements, same writes, so redux/save/theme/export are untouched.</p>
+
+  <h2>3. Architecture diagram</h2>
+  <pre>                          ┌────────────────────────────────────────────┐
+                          │  REDUX (canvas.present)  — source of truth   │
+                          │  objects: {transform, image:{scale,posX/Y}}  │
+                          └───────▲───────────────────────────▲─────────┘
+                  commit ONCE on  │                           │  read for
+                  gesture end     │                           │  render
+        ┌─────────────────────────┴───────┐      ┌────────────┴─────────────┐
+        │   GESTURE (per frame, NO redux)  │      │     RENDERERS (memoized) │
+        │  moveable cssText  ─┐            │      │  MainCanvas ─ Photo/Text/ │
+        │  imperative img/g  ─┼─► DOM      │      │   Shape/Sticker (memo)    │
+        │  applyLiveImage/   ─┘   (canvas  │      │  Footer ─ preview/* (memo)│
+        │  ObjectTransform        + footer)│      │                          │
+        └──────────────────────────────────┘      └──────────────────────────┘
+                  │                                            ▲
+                  └─────── footer DOM copies updated ──────────┘
+                          imperatively (no re-render)</pre>
+
+  <h2>4. Data-flow (one drag/rotate frame)</h2>
+  <pre> mouse move
+    │
+    ▼
+ react-moveable onRender
+    ├─ e.target.style.cssText += cssText      ── moves CANVAS object &lt;g&gt;  (GPU)
+    ├─ applyLiveObjectTransform(id,x,y,rot)   ── moves FOOTER object &lt;g&gt;   (GPU)
+    └─ (NO redux dispatch)                     ── MainCanvas does NOT re-render
+    │
+    ▼  (gesture end)
+ onDragend / onRotateEnd
+    └─ dispatch setCurrentObjectProperties({transform, history:true})
+         └─ ONE redux update → MainCanvas + Footer render the committed value
+              (matches the imperative DOM → no jump)</pre>
+  <p>Inner-image pan/zoom is identical, swapping <code>applyLiveObjectTransform</code> for <code>applyLiveImageTransform</code>, plus the rAF <code>updateRect()</code> loop that keeps the moveable box on the photo.</p>
+
+  <h2>5. Files changed</h2>
+  <table>
+    <tr><th>File</th><th>Change</th></tr>
+    <tr><td>helpers/canvasSliceGetters.js</td><td><code>getAllObjectsSortedByZIndex</code> returns <strong>stable</strong> wrapped items (WeakMap)</td></tr>
+    <tr><td>canvas/Text.jsx</td><td><code>React.memo(Text)</code></td></tr>
+    <tr><td>image/progressiveImage.js</td><td><code>applyLiveObjectTransform</code>; <code>queryLiveImageEls</code> + <code>applyLiveImageTransformEls</code> (query-once / apply-to-cached); <code>applyLiveImageTransform</code> convenience <span class="pill">live footer</span></td></tr>
+    <tr><td>canvas/ItemDragger.jsx</td><td>drag/rotate imperative; footer mirror in <code>onRender</code>; rAF <code>updateRect()</code> box-tracking + snap-back</td></tr>
+    <tr><td>canvas/Canvas.jsx</td><td>imperative image zoom (commit on pause, <code>history:true</code>); <code>activeObjImageRef</code> (undo-safe base); footer mirror; <code>zoomImgElsRef</code> caches targets per wheel session</td></tr>
+    <tr><td>canvas/Photo.jsx</td><td>GPU <code>transform</code> zoom; imperative inner pan; footer mirror; <code>data-id</code> on GhostImage; <code>panElsRef</code> caches targets for the pan</td></tr>
+  </table>
+
+  <h2>6. Gotchas (do not regress)</h2>
+  <ul>
+    <li class="warn">The footer reads from redux — any gesture made imperative MUST be mirrored to the footer DOM, or it freezes.</li>
+    <li class="warn">Undo preserves <code>activeObjectprops</code> — never use it as a gesture base; read the live object.</li>
+    <li class="warn">No mid-zoom <code>history:true</code> snapshot — it re-renders and resets the imperative transform (the "glitter"). Commit on pause.</li>
+    <li>Selection box needs the rAF <code>updateRect()</code> loop during pan + a re-measure on pan end.</li>
+    <li>Full-cover spread spine offset isn't re-applied in the footer mirror during a live drag (catches up on commit).</li>
+    <li class="warn">Cache the gesture's DOM targets, don't re-query per frame (<code>panElsRef</code>/<code>zoomImgElsRef</code>) — and <strong>clear them on gesture end</strong> (stale nodes would point at a removed object). Use <code>applyLiveImageTransformEls</code> on the hot path.</li>
+    <li>Deferred (still per-frame dispatch): multi-select group drag, object resize, whole-canvas zoom.</li>
+  </ul>
+
+  <h2>7. Verification checklist</h2>
+  <ul>
+    <li>DevTools "Highlight updates": dragging highlights <strong>only that object</strong>.</li>
+    <li>Profiler: <code>MainCanvas</code> = <strong>0 commits during a drag, 1 on release</strong>.</li>
+    <li>Zoom/pan/drag/rotate smooth at 4× CPU throttle.</li>
+    <li>Footer tracks live for drag, rotate, resize, image zoom, image pan.</li>
+    <li>Selection box follows the photo during pan; snaps back on a pan-handle click.</li>
+    <li>Zoom → Ctrl+Z → zoom again starts from the reverted scale.</li>
+    <li>Inner pan/zoom stays smooth with many footer thumbnails present (no per-frame DOM scan).</li>
+    <li>Export / save reflect the final committed position.</li>
+  </ul>
+
+  <footer>Photo-Editors · Canvas interaction performance · 2026-06-16. See also <a href="image-loading-optimization-2026-06-16.html">Image Loading Optimization →</a>.</footer>
+
+</div>
+</body>
+</html>

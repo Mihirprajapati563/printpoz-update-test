@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Photobook Full-Cover Merge-State Sync — Session Notes (2026-06-19)</title>
+<style>
+  :root {
+    --bg:#0f1115; --panel:#171a21; --text:#e6e8ec; --muted:#9aa3b2;
+    --accent:#5b9dff; --accent2:#54d6a0; --border:#262b35; --warn:#ffb454; --code:#0b0d11;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);
+    font:16px/1.65 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}
+  .wrap{max-width:960px;margin:0 auto;padding:48px 24px 96px}
+  h1{font-size:30px;line-height:1.2;margin:0 0 6px}
+  h2{font-size:22px;margin:44px 0 14px;padding-top:14px;border-top:1px solid var(--border)}
+  h3{font-size:18px;margin:26px 0 8px;color:var(--accent)}
+  .sub{color:var(--muted);margin:0 0 28px}
+  blockquote{margin:0 0 24px;padding:12px 18px;background:var(--panel);
+    border-left:3px solid var(--accent);border-radius:6px;color:var(--muted)}
+  code{background:var(--code);padding:2px 6px;border-radius:4px;font-size:.88em;
+    font-family:"SF Mono",ui-monospace,Menlo,Consolas,monospace;color:#d7e2ff}
+  a{color:var(--accent);text-decoration:none;border-bottom:1px solid rgba(91,157,255,.4)}
+  a:hover{border-bottom-color:var(--accent)}
+  .docnav{display:flex;gap:12px;flex-wrap:wrap;margin:0 0 24px}
+  .docnav a{display:inline-flex;align-items:center;gap:8px;padding:10px 16px;border:1px solid var(--border);
+    border-radius:10px;background:var(--panel);font-weight:600;border-bottom:1px solid var(--border)}
+  .docnav a:hover{border-color:var(--accent)}
+  .docnav a.here{border-color:var(--accent2);color:var(--accent2);cursor:default}
+  pre{background:var(--code);border:1px solid var(--border);border-radius:10px;
+    padding:16px 18px;overflow:auto;font-family:"SF Mono",ui-monospace,Menlo,Consolas,monospace;
+    font-size:13px;line-height:1.5;color:#cdd6e6}
+  table{width:100%;border-collapse:collapse;margin:14px 0 24px;font-size:15px}
+  th,td{text-align:left;padding:9px 12px;border:1px solid var(--border);vertical-align:top}
+  th{background:#1d2230}
+  td:first-child{color:var(--accent2)}
+  ul{padding-left:22px}
+  .ok{color:var(--accent2)} .warn{color:var(--warn)}
+  .pill{display:inline-block;font-size:12px;padding:2px 9px;border-radius:20px;
+    background:#1d2230;color:var(--accent2);border:1px solid var(--border);margin-left:8px}
+  footer{margin-top:56px;color:var(--muted);font-size:13px;border-top:1px solid var(--border);padding-top:16px}
+  /* ── visual diagrams ── */
+  .diagram{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:22px;margin:18px 0}
+  .diagram .dtitle{font-weight:700;color:var(--accent);margin-bottom:4px;font-size:16px}
+  .diagram .plain{color:var(--muted);font-size:14px;margin:0 0 16px}
+  .dgrow{display:flex;align-items:center;gap:10px;flex-wrap:wrap;justify-content:center}
+  .dgbox{border:2px solid var(--border);border-radius:10px;background:#11151c;padding:10px 14px;text-align:center;min-width:96px}
+  .dgbox .big{font-weight:700;font-size:15px;color:var(--text)}
+  .dgbox .smol{font-size:12px;color:var(--muted);margin-top:4px;line-height:1.4}
+  .dgbox.accent{border-color:var(--accent)} .dgbox.green{border-color:var(--accent2)} .dgbox.warn{border-color:var(--warn)} .dgbox.bad{border-color:#c0504d}
+  .arrow{color:var(--accent);font-size:26px;font-weight:700;line-height:1}
+  .vs{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  .vs .card{border:2px solid var(--border);border-radius:10px;padding:14px;background:#11151c}
+  .vs .card.bad{border-color:#c0504d} .vs .card.good{border-color:var(--accent2)}
+  .vs h4{margin:0 0 10px;font-size:14px}
+  .vs .smol{font-size:13px;color:var(--muted);line-height:1.5}
+  /* ── cover spread mockup ── */
+  .spread{display:flex;border:2px solid var(--border);border-radius:10px;overflow:hidden;max-width:420px;margin:6px auto 0}
+  .spread .half{flex:1;padding:18px 12px;text-align:center;font-weight:700;font-size:14px;background:#11151c}
+  .spread .spine{width:14px;background:repeating-linear-gradient(45deg,#262b35,#262b35 4px,#1a1e27 4px,#1a1e27 8px)}
+  .spread .back{color:var(--accent2)} .spread .front{color:var(--accent)} .spread .blank{color:#c0504d;font-weight:500}
+  @media (max-width:640px){.vs{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <h1>Photobook Full-Cover Merge-State Sync</h1>
+  <p class="sub">Session notes — 2026-06-19 · fixing the intermittent <strong>"back cover lands on page one instead of the front cover"</strong> bug when toggling Full Cover and switching saved sizes from the Size Settings popup.</p>
+
+  <nav class="docnav">
+    <a href="architecture.md">🏛️ Architecture →</a>
+    <a href="codebase-analysis.md">🔍 Codebase Analysis →</a>
+    <a href="data-flow-diagram.md">🔀 Data Flow Diagram →</a>
+    <a href="canvas.md">🖌️ Canvas →</a>
+    <a href="interaction.md">✋ Interaction →</a>
+    <a href="photo.md">📷 Photo →</a>
+    <a href="shape.md">🔷 Shape →</a>
+    <a href="sticker.md">⭐ Sticker →</a>
+    <a href="text.md">🔤 Text →</a>
+    <a href="react-native-migration-plan.md">📱 React Native Migration Plan →</a>
+    <a href="upload-pipeline.md">⬆️ Upload Pipeline →</a>
+    <a href="session-2026-06-12-upload-pipeline-rework.md">📝 Session: Upload Pipeline Rework (2026-06-12) →</a>
+    <a href="image-loading-optimization-2026-06-16.html">🖼️ Image Loading Optimization (2026-06-16) →</a>
+    <a href="canvas-interaction-performance-2026-06-16.html">🎯 Canvas Interaction Performance (2026-06-16) →</a>
+    <a href="resize-imperative-performance-2026-06-16.html">📐 Resize Imperative Performance (2026-06-16) →</a>
+    <a class="here">🅿️ Photobook Full Cover Sync (2026-06-19) — you are here</a>
+    <a href="photos-gallery-order-and-preview-2026-06-19.html">🗂️ Photos Gallery Order &amp; Preview (2026-06-19) →</a>
+    <a href="customer-autosave-activity-gate-2026-06-19.html">💾 Customer Auto-Save Activity Gate (2026-06-19) →</a>
+    <a href="canvas-rulers-2026-06-24.html">📏 Canvas Rulers (2026-06-24) →</a>
+  </nav>
+  <blockquote>The cover spread should be <strong>back (left) + spine + front (right)</strong> — confirmed by the user. The fix makes the <code>setSettings</code> reducer reconcile the page <strong>data shape</strong> to the effective <code>showFullCoverSheet</code> setting instead of reacting only to settings <em>transitions</em>.</blockquote>
+
+  <div class="diagram">
+    <div class="dtitle">Expected cover spread (page 0)</div>
+    <p class="plain"><code>layout[0]</code> = back cover (left half), <code>layout[1]</code> = front cover (shifted +halfWidth into the right half). This orientation is correct and unchanged.</p>
+    <div class="spread">
+      <div class="half back">BACK<br>layout[0]</div>
+      <div class="spine"></div>
+      <div class="half front">FRONT<br>layout[1]</div>
+    </div>
+  </div>
+
+  <h2>TL;DR</h2>
+  <table>
+    <tr><th>Problem</th><th>Fix</th></tr>
+    <tr><td>Merge/split in <code>setSettings</code> only ran on a settings <strong>transition</strong> (<code>!wasFullCover &amp;&amp; willBeFullCover</code>). Switching <strong>from an already-ON size into a size whose pages are un-merged</strong> made <code>!wasFullCover</code> false → <strong>no merge ran</strong>. Pages stayed un-merged while <code>showFullCoverSheet</code> stayed <code>true</code> → page 0 showed only <code>layout[0]</code> (the back cover), blank right half.</td><td>Drive merge/split off the <strong>data shape</strong> vs the effective setting: <strong>merge</strong> when <code>effectiveFullCover &amp;&amp; !alreadyMerged</code>, <strong>split</strong> when <code>!effectiveFullCover &amp;&amp; alreadyMerged</code>. Idempotent; self-heals on every size load.</td></tr>
+    <tr><td>Reading an omitted <code>showFullCoverSheet</code> as <code>false</code> would <span class="warn">tear apart a merged cover on every unrelated settings edit</span> (many callers send partial payloads).</td><td>Use the <em>effective</em> value: <code>(dataObj.showFullCoverSheet ?? state.settings.showFullCoverSheet) === true</code> — omitted flag = "unchanged", never "off".</td></tr>
+    <tr><td>Two independent merge/split sites (reducer over <strong>live pages</strong>, popup eager-prop over each size's <code>pages_c</code>) drift apart; the popup's early-return even flips the flag ON while leaving <code>pages_c</code> un-merged.</td><td>The reducer is the <strong>single choke point</strong> — every size-load path ends with <code>setSettings(theme.settings)</code>, so reconciliation happens on load. Popup helpers stay as-is (already idempotent).</td></tr>
+  </table>
+
+  <h2>How it works — at a glance 🎯</h2>
+
+  <div class="diagram">
+    <div class="dtitle">Transition-gated merge skipped the ON→ON case</div>
+    <p class="plain">Every ON→ON path where the target's <code>pages_c</code> was <em>already</em> merged worked fine — which is why the bug was intermittent. It only appeared when <strong>pages were un-merged while <code>showFullCoverSheet</code> was already <code>true</code></strong>.</p>
+    <div class="vs">
+      <div class="card bad">
+        <h4>❌ Before (transition-gated)</h4>
+        <div class="smol"><code>merge only if !wasFullCover</code><br>switch ON-size → ON-size skips merge<br>→ pages un-merged, flag ON<br>→ page 0 shows <span class="warn">BACK only, no front</span></div>
+      </div>
+      <div class="card good">
+        <h4>✅ After (data-shape reconcile)</h4>
+        <div class="smol"><code>merge if NOT already merged</code><br>pages always match the setting<br>→ self-heals drift on every load<br>→ page 0 = back-left + front-right</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="diagram">
+    <div class="dtitle">Single choke point: every size-load tail is <code>setSettings</code></div>
+    <p class="plain">Load paths call <code>setEditorPages</code>/<code>applyTheme</code> (no photobook merge) and then <code>setSettings(theme.settings)</code> — so reconciliation must live in <code>setSettings</code>, the common tail.</p>
+    <div class="dgrow">
+      <div class="dgbox accent"><div class="big">selectAndCloseSavedSize<br>· addSize · applySpineSettings</div><div class="smol">load size → setSettings()</div></div>
+      <span class="arrow">→</span>
+      <div class="dgbox"><div class="big">setSettings reducer</div><div class="smol">effective flag vs<br>alreadyMerged</div></div>
+      <span class="arrow">→</span>
+      <div class="dgbox green"><div class="big">pages reconciled</div><div class="smol">merge / split to match<br>(idempotent)</div></div>
+    </div>
+  </div>
+
+  <h2>1. The architecture (two independent merge/split sites)</h2>
+  <p>Full Cover merges the separate <strong>front cover (page 0)</strong> and <strong>back cover (last page)</strong> into one spread on page 0. The logic lives in <strong>two places operating on independent data with independent guards</strong>:</p>
+  <table>
+    <tr><th>Site</th><th>Operates on</th><th>Old guard</th></tr>
+    <tr><td><code>setSettings</code> reducer — <code>canvas.js</code></td><td><strong>live</strong> <code>state.pages</code></td><td>settings <strong>transition</strong> + data shape (<code>alreadyMerged</code>)</td></tr>
+    <tr><td><code>applySpineSettings</code> eager-prop — <code>SizeSettingsPopup.jsx</code></td><td>each saved size's <code>pages_c</code> in <code>allThemes</code></td><td>data shape only (<code>merge/splitPhotobookCover</code> early-return on <code>layout.length</code>)</td></tr>
+  </table>
+  <p>Size-load paths (<code>selectAndCloseSavedSize</code>, <code>addSize</code>) call <code>setEditorPages</code>/<code>applyTheme</code> (no photobook merge) then <code>setSettings(theme.settings)</code>. So <strong>all reconciliation must happen in <code>setSettings</code></strong> — the common tail of every load.</p>
+
+  <h2>2. Root cause</h2>
+  <p>Three sources can leave <strong>un-merged pages + <code>showFullCoverSheet: true</code></strong>:</p>
+  <table>
+    <tr><th>Source</th><th>What it does</th></tr>
+    <tr><td>Eager-prop early return (<code>SizeSettingsPopup.jsx</code>)</td><td>No decodable pages → returns <code>{ ...theme, settings: nextSettings }</code>, flipping the flag <code>true</code> while leaving <code>pages_c</code> <strong>un-merged</strong>.</td></tr>
+    <tr><td>Transition-gated reducer merge</td><td>Switching <strong>from an already-ON size</strong> (<code>wasFullCover = true</code>) into an un-merged size makes <code>!wasFullCover</code> false → the merge never runs.</td></tr>
+    <tr><td>DPI/size convert (<code>confirmMultiConvertDpi</code>)</td><td>Mints a size with live-merged <code>pages_c</code> but copies <code>sourceTheme.settings</code>, which can disagree.</td></tr>
+  </table>
+  <p>In all three, page 0 has a single <code>layout[0]</code> (back-cover content) while the renderer believes full cover is on (<code>hideLastCover</code> hides the trailing back page) — <strong>back cover on page one, front cover missing.</strong></p>
+
+  <h2>3. The fix (single choke point)</h2>
+  <p>In <code>setSettings</code> (photobook branch) — <code>src/store/slices/canvas.js</code>:</p>
+  <pre>// RESULTING (effective) full-cover state — NOT a transition flag. Omitted flag
+// (partial settings edits) falls back to the existing setting = "unchanged".
+const willBeFullCover =
+  (dataObj.showFullCoverSheet ?? state.settings?.showFullCoverSheet) === true;
+const alreadyMerged = (state.pages[0]?.layout?.length || 0) >= 2;
+
+// ON: merge front + back into a spread on page 0 when the setting is ON
+// but the pages aren't merged yet.
+if (willBeFullCover &amp;&amp; !alreadyMerged &amp;&amp; state.pages.length >= 2) { /* merge */ }
+
+// OFF: split the merged spread back into separate front/back pages when the
+// setting is OFF but the pages are still merged.
+if (!willBeFullCover &amp;&amp; alreadyMerged &amp;&amp; state.pages.length >= 2) { /* split */ }</pre>
+  <p>What changed: the merge dropped the <code>!wasFullCover</code> transition term; the split dropped the <code>wasFullCover &amp;&amp; ...=== false</code> transition terms; <code>willBeFullCover</code> is now the <strong>effective</strong> value via <code>??</code>. <strong>Kept intact:</strong> the <code>[backLayout, frontLayout]</code> orientation, the <code>halfWidth</code> shift, the <code>alreadyMerged</code> guard, the <code>hideLastCover</code> forced-exit, and the spine-width shift.</p>
+
+  <h2>4. Why partial payloads are safe <span class="pill">the landmine avoided</span></h2>
+  <p>Many <code>setSettings</code> callers send <strong>partial</strong> payloads. The settings sidebar dispatches <code>setSettings({ ...settings, [key]: value })</code>, which <strong>spreads the current settings</strong>, so <code>showFullCoverSheet</code> is present with its current value (= the effective value). Truly-omitted payloads fall back to <code>state.settings.showFullCoverSheet</code> via <code>??</code>.</p>
+  <p>If omission were read as <code>false</code>, a data-shape split would <span class="warn">rip apart an already-merged cover on every unrelated settings edit.</span> The <code>??</code> fallback is what makes the data-shape approach safe. The only callers setting a dynamic boolean (<code>applySpineSettings</code>, <code>CreateThemeDialog</code> save payload) always send an explicit <code>true</code>/<code>false</code>, where <code>false</code> unambiguously means "turn off."</p>
+
+  <h2>5. Files changed</h2>
+  <table>
+    <tr><th>File</th><th>Change</th></tr>
+    <tr><td><code>src/store/slices/canvas.js</code></td><td><code>setSettings</code> photobook branch: merge/split reconcile by <strong>data shape</strong> vs the <strong>effective</strong> <code>showFullCoverSheet</code> (omitted = unchanged). Two stale comments updated.</td></tr>
+  </table>
+  <p>No changes were needed in <code>SizeSettingsPopup.jsx</code> — its <code>merge/splitPhotobookCover</code> helpers are already idempotent, and any wrong merge-state they leave is corrected when that size loads through <code>setSettings</code>.</p>
+
+  <h2>6. Scope / what was NOT touched</h2>
+  <ul>
+    <li><strong>Layflat</strong> cover logic — untouched; still gates merge/split on <code>coverEnabled</code>/<code>showFullCoverSheet</code> <em>transitions</em> (its cover model reconstructs the pages array differently).</li>
+    <li><strong>Theme switching</strong> (<code>ThemesAction</code> → <code>replaceSettings</code>) — a different flow that fully replaces pages; not part of the reported triggers. <code>replaceSettings</code> does <code>state.settings = payload</code> with no merge/split.</li>
+    <li><strong><code>applyTheme</code> / <code>setEditorPages</code></strong> — deliberately left without reconcile; they run <strong>before</strong> <code>setSettings</code>, so they'd act on stale flags.</li>
+  </ul>
+
+  <h2>7. Gotchas (do not regress)</h2>
+  <ul>
+    <li><strong>Effective value, not raw payload.</strong> Always compute <code>willBeFullCover</code> as <code>(dataObj.showFullCoverSheet ?? state.settings.showFullCoverSheet) === true</code>. Reading a missing flag as <code>false</code> splits merged covers on unrelated edits.</li>
+    <li><strong>Reconcile lives in <code>setSettings</code> only.</strong> Don't move it into <code>applyTheme</code>/<code>setEditorPages</code> (they run first, before the flag is set).</li>
+    <li><strong>Keep <code>[backLayout, frontLayout]</code> orientation.</strong> <code>layout[0]</code> = back (left), <code>layout[1]</code> = front (shifted +halfWidth). Swapping inverts the spread.</li>
+    <li><strong><code>alreadyMerged</code> keys on <code>state.pages[0].layout.length >= 2</code>.</strong> Page 0 is the cover (a single half-sheet when not full-cover); interior spreads also have 2 layouts but are never page 0.</li>
+    <li><strong><code>setSettings</code> is in <code>ignoredCanvasActions</code></strong> (not recorded in undo). The merge/split mutates <code>state.pages</code> as part of the present state — same as the pre-existing code — so no separate undo step is created.</li>
+  </ul>
+
+  <h2>8. Verification checklist</h2>
+  <ul>
+    <li>Enable Full Cover → page 0 shows <strong>back (left) + front (right)</strong> every time.</li>
+    <li>Toggle Full Cover OFF → front and back split into separate pages, content intact.</li>
+    <li>Enable Full Cover, then <strong>switch between saved sizes</strong> repeatedly → every size shows back-left + front-right (no "back only" page 0).</li>
+    <li><strong>Toggle ON/OFF repeatedly</strong> from the Size Settings popup → no drift, no corruption.</li>
+    <li>Turning <strong>"Hide Back Cover" off</strong> while full cover is on exits full cover and restores the separate back cover page.</li>
+    <li>An unrelated settings change while full cover is on does <strong>not</strong> split the cover.</li>
+    <li>Spine width still shifts the right-half (front) cover objects correctly when paper thickness changes.</li>
+  </ul>
+
+  <footer>Photo-Editors · photobook full-cover merge-state sync · 2026-06-19</footer>
+
+</div>
+</body>
+</html>

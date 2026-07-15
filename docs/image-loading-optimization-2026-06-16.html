@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Image Loading Optimization — Session Notes (2026-06-16)</title>
+<style>
+  :root {
+    --bg: #0f1115; --panel: #171a21; --text: #e6e8ec; --muted: #9aa3b2;
+    --accent: #5b9dff; --accent2: #54d6a0; --border: #262b35; --warn: #ffb454;
+    --code-bg: #0b0d11;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font: 16px/1.65 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  }
+  .wrap { max-width: 920px; margin: 0 auto; padding: 48px 24px 96px; }
+  h1 { font-size: 30px; line-height: 1.2; margin: 0 0 6px; }
+  h2 { font-size: 22px; margin: 44px 0 14px; padding-top: 14px; border-top: 1px solid var(--border); }
+  h3 { font-size: 18px; margin: 28px 0 8px; color: var(--accent); }
+  p, li { color: var(--text); }
+  .sub { color: var(--muted); margin: 0 0 28px; }
+  blockquote {
+    margin: 0 0 24px; padding: 12px 18px; background: var(--panel);
+    border-left: 3px solid var(--accent); border-radius: 6px; color: var(--muted);
+  }
+  .tldr { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 6px 22px 14px; }
+  code { background: var(--code-bg); padding: 2px 6px; border-radius: 4px; font-size: 0.88em;
+    font-family: "SF Mono", ui-monospace, Menlo, Consolas, monospace; color: #d7e2ff; }
+  a { color: var(--accent); text-decoration: none; border-bottom: 1px solid rgba(91,157,255,.4); }
+  a:hover { border-bottom-color: var(--accent); }
+  .docnav { display: flex; gap: 12px; flex-wrap: wrap; margin: 0 0 24px; }
+  .docnav a { display: inline-flex; align-items: center; gap: 8px; padding: 10px 16px; border: 1px solid var(--border);
+    border-radius: 10px; background: var(--panel); font-weight: 600; border-bottom: 1px solid var(--border); }
+  .docnav a:hover { border-color: var(--accent); }
+  .docnav a.here { border-color: var(--accent2); color: var(--accent2); cursor: default; }
+  table { width: 100%; border-collapse: collapse; margin: 14px 0 24px; font-size: 15px; }
+  th, td { text-align: left; padding: 9px 12px; border: 1px solid var(--border); vertical-align: top; }
+  th { background: #1d2230; color: var(--text); }
+  td:first-child { white-space: nowrap; color: var(--accent2); }
+  .pill { display: inline-block; font-size: 12px; padding: 2px 9px; border-radius: 20px;
+    background: #1d2230; color: var(--accent2); border: 1px solid var(--border); margin-left: 8px; }
+  .warn { color: var(--warn); }
+  .ok { color: var(--accent2); }
+  ul { padding-left: 22px; }
+  .flow { counter-reset: step; list-style: none; padding-left: 0; }
+  .flow li { position: relative; padding: 8px 0 8px 44px; border-bottom: 1px dashed var(--border); }
+  .flow li::before {
+    counter-increment: step; content: counter(step);
+    position: absolute; left: 0; top: 8px; width: 28px; height: 28px;
+    background: var(--accent); color: #07101f; font-weight: 700; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center; font-size: 14px;
+  }
+  footer { margin-top: 56px; color: var(--muted); font-size: 13px; border-top: 1px solid var(--border); padding-top: 16px; }
+  /* ── visual diagrams ── */
+  .diagram { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 22px; margin: 18px 0; }
+  .diagram .dtitle { font-weight: 700; color: var(--accent); margin-bottom: 4px; font-size: 16px; }
+  .diagram .plain { color: var(--muted); font-size: 14px; margin: 0 0 16px; }
+  .dgrow { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; justify-content: center; }
+  .dgbox { border: 2px solid var(--border); border-radius: 10px; background: #11151c; padding: 10px 14px; text-align: center; min-width: 96px; }
+  .dgbox .big { font-weight: 700; font-size: 15px; color: var(--text); }
+  .dgbox .smol { font-size: 12px; color: var(--muted); margin-top: 4px; line-height: 1.4; }
+  .dgbox.accent { border-color: var(--accent); } .dgbox.green { border-color: var(--accent2); } .dgbox.warn { border-color: var(--warn); }
+  .arrow { color: var(--accent); font-size: 26px; font-weight: 700; line-height: 1; }
+  .swatch { display: block; background: linear-gradient(135deg,#6aa0ff,#54d6a0); border-radius: 4px; margin: 0 auto 8px; }
+  .legend { display: flex; gap: 18px; flex-wrap: wrap; margin-top: 14px; font-size: 13px; color: var(--muted); justify-content: center; }
+  .legend b { color: var(--text); }
+  .vs { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  .vs .card { border: 2px solid var(--border); border-radius: 10px; padding: 14px; background: #11151c; }
+  .vs .bad { border-color: #c0504d; } .vs .good { border-color: var(--accent2); }
+  .vs h4 { margin: 0 0 8px; font-size: 14px; }
+  @media (max-width: 640px) { .vs { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <h1>Image Loading Optimization</h1>
+  <p class="sub">Session notes — 2026-06-16 · how canvas/editor images are loaded &amp; displayed, optimized for 500–2000 photos (originals up to 30&nbsp;MB)</p>
+
+  <nav class="docnav">
+    <a href="architecture.md">🏛️ Architecture →</a>
+    <a href="codebase-analysis.md">🔍 Codebase Analysis →</a>
+    <a href="data-flow-diagram.md">🔀 Data Flow Diagram →</a>
+    <a href="canvas.md">🖌️ Canvas →</a>
+    <a href="interaction.md">✋ Interaction →</a>
+    <a href="photo.md">📷 Photo →</a>
+    <a href="shape.md">🔷 Shape →</a>
+    <a href="sticker.md">⭐ Sticker →</a>
+    <a href="text.md">🔤 Text →</a>
+    <a href="react-native-migration-plan.md">📱 React Native Migration Plan →</a>
+    <a href="upload-pipeline.md">⬆️ Upload Pipeline →</a>
+    <a href="session-2026-06-12-upload-pipeline-rework.md">📝 Session: Upload Pipeline Rework (2026-06-12) →</a>
+    <a class="here">🖼️ Image Loading Optimization (2026-06-16) — you are here</a>
+    <a href="canvas-interaction-performance-2026-06-16.html">🎯 Canvas Interaction Performance (2026-06-16) →</a>
+    <a href="resize-imperative-performance-2026-06-16.html">📐 Resize Imperative Performance (2026-06-16) →</a>
+    <a href="photobook-full-cover-sync-2026-06-19.html">🅿️ Photobook Full Cover Sync (2026-06-19) →</a>
+    <a href="photos-gallery-order-and-preview-2026-06-19.html">🗂️ Photos Gallery Order &amp; Preview (2026-06-19) →</a>
+    <a href="customer-autosave-activity-gate-2026-06-19.html">💾 Customer Auto-Save Activity Gate (2026-06-19) →</a>
+    <a href="canvas-rulers-2026-06-24.html">📏 Canvas Rulers (2026-06-24) →</a>
+  </nav>
+  <blockquote>Companion to <code>docs/upload-pipeline.md</code> (upload side) and to <a href="canvas-interaction-performance-2026-06-16.html">Canvas Interaction Performance</a> (drag/zoom/pan rendering). This document covers display/loading.</blockquote>
+
+  <div class="tldr">
+    <h3 style="color:var(--accent2)">TL;DR</h3>
+    <ul>
+      <li><strong>No blob cache.</strong> Live server (S3/CDN) URLs are the single source of truth. The browser's HTTP cache already makes repeat views instant; a blob can't speed up a first download and would only pin memory. Blobs exist <em>only</em> for the brief in-flight-upload preview.</li>
+      <li><strong>Progressive ladder per image: <code>small → medium → large</code></strong> — climbed once and kept (no variant swapping mid-gesture).</li>
+      <li><strong>Zoom is a GPU <code>transform: scale()</code>, not a width/height change</strong> — the bitmap decodes once and the GPU composites the zoom (smooth on low-end, no re-raster, no <code>src</code> swap to blink).</li>
+      <li><strong>Preload current + adjacent pages</strong> so page flips are download-free.</li>
+      <li><strong>Fast click-to-place:</strong> probe the cached <code>small</code> variant for orientation instead of downloading the 30&nbsp;MB <code>large</code>.</li>
+      <li><strong>Two bug fixes:</strong> the click→select "blink" (placeholder flash) and "delete button does nothing" on a spread's non-active side.</li>
+      <li class="ok"><strong>Print quality is never affected</strong> by the canvas display variant — export renders server-side from <code>large</code>/original.</li>
+    </ul>
+  </div>
+
+  <h2>How it works — at a glance 🖼️</h2>
+
+  <div class="diagram">
+    <div class="dtitle">① One photo → four sizes</div>
+    <p class="plain">The server makes 4 copies of every photo, from tiny to full-size. We always show the <em>smallest copy that still looks right</em> — like picking the right zoom level on a map instead of always downloading the whole world.</p>
+    <div class="dgrow">
+      <div class="dgbox green"><span class="swatch" style="width:22px;height:16px"></span><div class="big">thumb</div><div class="smol">≈256px<br>sidebar tiles</div></div>
+      <span class="arrow">›</span>
+      <div class="dgbox"><span class="swatch" style="width:36px;height:27px"></span><div class="big">small</div><div class="smol">≈700px<br>previews · 1st paint</div></div>
+      <span class="arrow">›</span>
+      <div class="dgbox accent"><span class="swatch" style="width:54px;height:40px"></span><div class="big">medium</div><div class="smol">≈1400px<br>canvas editing</div></div>
+      <span class="arrow">›</span>
+      <div class="dgbox warn"><span class="swatch" style="width:78px;height:58px"></span><div class="big">large</div><div class="smol">full-res<br>print / export only</div></div>
+    </div>
+  </div>
+
+  <div class="diagram">
+    <div class="dtitle">② What you SEE when an image loads (progressive)</div>
+    <p class="plain">Instead of staring at a blank box waiting for a 30&nbsp;MB photo, you see a tiny version <em>instantly</em>, and it sharpens a moment later — like a video thumbnail snapping into focus.</p>
+    <div class="dgrow">
+      <div class="dgbox green"><div class="big">⚡ 0&nbsp;ms</div><div class="smol">tiny <code>small</code> shows<br>INSTANTLY (a touch soft)</div></div>
+      <span class="arrow">›</span>
+      <div class="dgbox accent"><div class="big">a beat later</div><div class="smol"><code>medium</code> arrives<br>→ sharpens up</div></div>
+      <span class="arrow">›</span>
+      <div class="dgbox warn"><div class="big">when you click it</div><div class="smol"><code>large</code> loads<br>→ razor sharp</div></div>
+    </div>
+    <div class="legend"><span>🟢 = instant</span><span>🔵 = main editing quality</span><span>🟠 = full quality, on demand</span></div>
+  </div>
+
+  <div class="diagram">
+    <div class="dtitle">③ Which size goes where</div>
+    <p class="plain">Big screens get big copies; tiny thumbnails get tiny copies. Nobody downloads a 30&nbsp;MB photo to show a 100-pixel thumbnail.</p>
+    <div class="dgrow" style="gap:14px">
+      <div class="dgbox green"><div class="big">Sidebar</div><div class="smol">uses <code>thumb</code></div></div>
+      <div class="dgbox green"><div class="big">Footer preview</div><div class="smol">uses <code>small</code></div></div>
+      <div class="dgbox accent"><div class="big">Canvas (editing)</div><div class="smol">uses <code>medium</code></div></div>
+      <div class="dgbox warn"><div class="big">Selected image</div><div class="smol">upgrades to <code>large</code></div></div>
+      <div class="dgbox"><div class="big">Print / Export</div><div class="smol"><code>large</code>/original<br>on the SERVER 🖥️<br>(never your browser)</div></div>
+    </div>
+  </div>
+
+  <div class="diagram">
+    <div class="dtitle">④ Page flips are instant (preloading)</div>
+    <p class="plain">While you work on one page, we quietly fetch the next and previous pages' images in the background — so flipping feels instant instead of "loading…".</p>
+    <div class="dgrow">
+      <div class="dgbox"><div class="big">◀ prev page</div><div class="smol">pre-loaded</div></div>
+      <span class="arrow">·</span>
+      <div class="dgbox accent"><div class="big">★ current page</div><div class="smol">you're here</div></div>
+      <span class="arrow">·</span>
+      <div class="dgbox"><div class="big">next page ▶</div><div class="smol">pre-loaded</div></div>
+    </div>
+  </div>
+
+  <div class="diagram">
+    <div class="dtitle">⑤ Why we DON'T copy images into "blobs"</div>
+    <p class="plain">A "blob" is a private copy of an image kept in the app's memory. But the browser <em>already</em> keeps a copy of everything it downloads (its cache). So a blob = a second copy = wasted memory, for zero speed gain — and it can't make the first download any faster.</p>
+    <div class="vs">
+      <div class="card bad"><h4>❌ Blob cache (rejected)</h4><div class="smol" style="color:var(--muted)">Download → make our OWN copy in memory → use it.<br>= <b style="color:#e88">2 copies</b> of every image · pins memory · first load no faster.</div></div>
+      <div class="card good"><h4>✅ Just use the URL</h4><div class="smol" style="color:var(--muted)">Download → the <b style="color:var(--accent2)">browser caches it for free</b> → reuse instantly.<br>= 1 copy · auto-evicted · simpler.</div></div>
+    </div>
+  </div>
+
+  <h2>Problem statement</h2>
+  <p>The editor must stay smooth with 500–2000 wedding photos, each up to 30&nbsp;MB. Pain points addressed:</p>
+  <ul>
+    <li>Canvas rendered the full-res <code>large</code> variant — a 4000×3000 image decodes to ~48&nbsp;MB of RAM each; 20 on a spread ≈ 1&nbsp;GB.</li>
+    <li>Clicking a sidebar photo took <strong>seconds</strong> — it downloaded the full <code>large</code> just to read EXIF dimensions before placing.</li>
+    <li>A visible <strong>"blink"</strong> when an image was placed/selected.</li>
+    <li>The <strong>Delete button silently did nothing</strong> for images on the non-active side of a spread.</li>
+    <li>Open questions: does <code>medium</code> on canvas hurt quality? Should we cache via blobs?</li>
+  </ul>
+
+  <h2>Decisions &amp; rationale</h2>
+
+  <h3>1. Blobs vs. live URLs → live URLs (no blob cache)</h3>
+  <p>A blob cache is <code>fetch → download → createObjectURL → use</code>. Versus pointing <code>&lt;img&gt;</code> at the live URL:</p>
+  <table>
+    <tr><th>Dimension</th><th>Blob cache</th><th>Live URL (chosen)</th></tr>
+    <tr><td>First load</td><td>Full network download — <span class="warn">no faster</span></td><td>Same download, progressive paint hides it</td></tr>
+    <tr><td>Repeat views</td><td>Instant from blob</td><td>Instant from browser HTTP cache (free)</td></tr>
+    <tr><td>Memory</td><td>Pins ~600&nbsp;MB for 2000 photos until revoked</td><td>Browser-managed, auto-evicted</td></tr>
+    <tr><td>Complexity</td><td>LRU + revoke + leak risk</td><td>None</td></tr>
+  </table>
+  <p>The blob's only unique benefit is surviving a <strong>URL that expires</strong> (short-TTL signed S3 URLs). If display variants are long-lived/public CDN URLs, blobs add nothing. → <strong>No blob cache.</strong> If URLs do expire mid-session, fix that on the CDN, not with blobs.</p>
+
+  <h3>2. Progressive loading ladder → <code>small → medium → large</code>, adaptive</h3>
+  <ul>
+    <li><strong><code>small</code></strong> paints immediately (tens of KB) — instant content.</li>
+    <li><strong><code>medium</code></strong> swaps in after off-thread decode — clean sharpen, no flash.</li>
+    <li><strong><code>large</code></strong> climbed once after medium and kept — download gated to the <strong>selected</strong> image; once decoded shown for any image, even after deselect.</li>
+  </ul>
+  <p><span class="ok">GPU-composited zoom (the real fix).</span> The canvas used to render at <code>image.width * scale</code> — changing the <code>&lt;img&gt;</code> width/height, which <strong>re-rasterizes the source bitmap every wheel frame</strong> (the lag, brutal on low-end). It's now rendered at <strong>fixed intrinsic size</strong> with zoom as a CSS <code>transform: translate(pos) scale(image.scale)</code> (<code>transformOrigin: 0 0</code>). The bitmap decodes <strong>once</strong>; the GPU samples the existing texture → smooth at any resolution, even <code>large</code>. <code>transformOrigin: 0 0</code> preserves the old top-left anchoring so <code>positionX/Y</code> math is unchanged. Clip-path/mask/flip are frame-space and unaffected.</p>
+  <p><span class="ok">No mid-gesture variant swapping (the blink fix).</span> Because GPU zoom no longer re-rasterizes, there's no reason to drop to <code>medium</code> during a zoom — the loader no longer swaps the <code>&lt;img src&gt;</code> mid-gesture (that swap was the blink). The ladder climbs <code>small → medium → large</code> once and keeps <code>large</code>.</p>
+  <p><span class="warn">Why not blanket <code>large</code>:</span> at 2000 photos that pins gigabytes of decoded bitmaps; even the whole current page at large made interaction heavy. So large is <strong>selected-image-only</strong> — at most one full-res bitmap on canvas, never during a gesture. Non-selected images stay <code>medium</code> (print/export uses large/original server-side regardless).</p>
+  <blockquote><strong>Critical reassurance:</strong> the canvas display variant has <em>zero</em> effect on print/export. Export rasterizes server-side from <code>large</code>/original (<code>generatePageSvg.js</code> feeds <code>item.url</code>). "Medium on canvas" can never produce a low-quality printed book — it only affects on-screen editing sharpness, which the ladder maximizes anyway.</blockquote>
+
+  <h3>3. Preloading → current + next + previous page</h3>
+  <p>On project load and page change, warm the browser cache (bounded concurrency) for the current page and its neighbours so flipping is download-free. Keyed on page index + page count only — never re-runs on drag/edit frames.</p>
+
+  <h3>4. Fast click-to-place → probe <code>small</code>, not <code>large</code></h3>
+  <p>Placing a sidebar photo needs EXIF-correct orientation. It used to <code>await</code> a download of the full <code>large</code> (up to 30&nbsp;MB) — the multi-second hang. Now it probes the <strong><code>small</code></strong> variant (already in the browser cache because the sidebar tile rendered it → ~1&nbsp;ms cache hit) for orientation, and takes full-resolution magnitude from the <code>large</code> <strong>metadata</strong> (<code>w/h</code>). Both placement reducers stay dimensionally accurate.</p>
+
+  <h3>5. Blink fix → initialize <code>isPlaceholder</code> from <code>item.url</code></h3>
+  <p><code>isPlaceholder</code> defaulted to <code>true</code>, so a freshly-placed image rendered the drop-image placeholder for one frame before a <code>useEffect</code> corrected it — the visible blink. It now initializes from <code>item.url</code> so an image with a URL renders directly.</p>
+
+  <h3>6. Delete fix → search all sides of the active page</h3>
+  <p><code>removeObjectInPage</code> only searched <code>layout[activeSide]</code>, while every other control searches all layouts. On a spread, an image on the <strong>non-active side</strong> was selectable and editable but <strong>un-deletable</strong>. The reducer now locates the object across all sides (both <code>objects</code> and <code>safeAreaObjects</code>). Object IDs are unique UUIDs, so the wider search can never pick the wrong object; single-page and active-side deletes are unchanged.</p>
+
+  <h2>Current end-to-end flow</h2>
+  <ol class="flow">
+    <li><strong>Upload</strong> — select → pre-registered in Redux queue → resize pool makes <code>large/medium/small/thumbnail</code> + 768px preview blob (off main thread) → bounded workers upload to S3 (signed-URL multipart) → server returns <code>urls:[{size,url,w,h}]</code> + server <code>_id</code>.</li>
+    <li><strong>Sidebar</strong> — each tile shows the <code>small</code> live URL (browser-cached). In-flight uploads show as pending tiles using the local preview blob.</li>
+    <li><strong>Click to place</strong> — probe <code>small</code> for orientation (cache hit), magnitude from <code>large</code> metadata, build object with live <code>urls[]</code> (or blob preview + <code>pendingImageId</code> if uploading), dispatch.</li>
+    <li><strong>Canvas display</strong> — <code>useProgressiveImage(item, isActive)</code>: <code>small</code> instant → <code>medium</code> → <code>large</code> (immediate if selected, idle otherwise). Canvas preloads current + adjacent pages.</li>
+    <li><strong>Upload finishes</strong> — <code>replaceImageSourceAcrossPages</code> swaps blob → live URL across all pages and patches undo snapshots so Ctrl-Z can't resurrect the blob.</li>
+    <li><strong>Repeat views / page flips</strong> — browser HTTP cache + preloader. No blobs, no re-fetch.</li>
+    <li><strong>Save / Order / Export</strong> — reads <code>item.url</code> (live) from Redux. A <code>blob:</code> can never reach the payload.</li>
+  </ol>
+
+  <h2>Files changed</h2>
+  <table>
+    <tr><th>File</th><th>Change</th></tr>
+    <tr><td>library/utils/image/progressiveImage.js <span class="pill">new</span></td><td><code>useProgressiveImage</code> (small→medium→large ladder), <code>preloadImages</code>, <code>pickVariantUrl</code>, <code>resetImageLoadState</code>.</td></tr>
+    <tr><td>components/canvas/Photo.jsx</td><td><code>useProgressiveImage(item, isActive)</code> + <code>decoding="async"</code>; <code>isPlaceholder</code> initialized from <code>item.url</code> (blink fix); thread <code>isActive</code> → <code>PhotoItem</code> → <code>PhotoHolder</code>.</td></tr>
+    <tr><td>components/canvas/Canvas.jsx</td><td>Preload effect for current + adjacent pages.</td></tr>
+    <tr><td>layout/index.jsx</td><td><code>resetImageLoadState()</code> on editor unmount.</td></tr>
+    <tr><td>tools/photos/PhotosAction.jsx</td><td>Click-to-place probes <code>small</code> (not <code>large</code>); magnitude from <code>large</code> metadata.</td></tr>
+    <tr><td>store/slices/canvas.js</td><td><code>removeObjectInPage</code> searches all sides of the active page (delete fix).</td></tr>
+  </table>
+  <blockquote>A short-lived <code>blobImageCache.js</code> was prototyped and <strong>deleted</strong> after we concluded blobs are redundant with the browser cache. Do not reintroduce it.</blockquote>
+
+  <h2>Rejected approaches</h2>
+  <ul>
+    <li><strong>Blob URL cache for display</strong> — redundant with the browser HTTP cache, can't speed up first load, pins memory. Deleted.</li>
+    <li><strong>Storing blobs in Redux, swap to live on order</strong> — would put blobs in undo snapshots and force every save/export path to reverse-swap (leak risk).</li>
+    <li><strong>Blanket <code>large</code> on every canvas image</strong> — gigabytes of decoded bitmaps at 2000 photos; replaced by the adaptive ladder.</li>
+  </ul>
+
+  <h2>Performance characteristics</h2>
+  <ul>
+    <li><strong>First paint:</strong> instant (<code>small</code>), regardless of original size.</li>
+    <li><strong>Editing sharpness:</strong> full <code>large</code> on the focused image immediately; whole visible page reaches <code>large</code> on idle.</li>
+    <li><strong>Memory:</strong> bounded — only the active page's images are decoded.</li>
+    <li><strong>Network:</strong> one cached <code>small</code> per sidebar click; medium/large fetched once then HTTP-cached; adjacent pages prefetched.</li>
+    <li><strong>Print/export:</strong> always full-res server-side — independent of canvas display.</li>
+  </ul>
+
+  <h2>Future options (not built)</h2>
+  <ul>
+    <li><strong>Bulk-upload display reuse</strong> — keep the just-made local blob for display after upload to avoid re-downloading freshly-uploaded images during large template creation. Only if measured to lag.</li>
+    <li><strong>Zoom-aware upgrade</strong> — upgrade non-selected images to <code>large</code> when canvas zoom exceeds what <code>medium</code> renders sharply.</li>
+    <li><strong>CDN cache headers / immutable variant keys</strong> — for instant reopen across sessions.</li>
+  </ul>
+
+  <footer>Photo-Editors · Image loading optimization · 2026-06-16. See also <a href="canvas-interaction-performance-2026-06-16.html">Canvas Interaction Performance →</a>, <code>docs/upload-pipeline.md</code> and <code>docs/session-2026-06-12-upload-pipeline-rework.md</code>.</footer>
+
+</div>
+</body>
+</html>

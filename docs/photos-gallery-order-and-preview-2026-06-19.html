@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Photos Gallery Order &amp; Preview Variant — Session Notes (2026-06-19)</title>
+<style>
+  :root {
+    --bg:#0f1115; --panel:#171a21; --text:#e6e8ec; --muted:#9aa3b2;
+    --accent:#5b9dff; --accent2:#54d6a0; --border:#262b35; --warn:#ffb454; --code:#0b0d11;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);
+    font:16px/1.65 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}
+  .wrap{max-width:960px;margin:0 auto;padding:48px 24px 96px}
+  h1{font-size:30px;line-height:1.2;margin:0 0 6px}
+  h2{font-size:22px;margin:44px 0 14px;padding-top:14px;border-top:1px solid var(--border)}
+  h3{font-size:18px;margin:26px 0 8px;color:var(--accent)}
+  .sub{color:var(--muted);margin:0 0 28px}
+  blockquote{margin:0 0 24px;padding:12px 18px;background:var(--panel);
+    border-left:3px solid var(--accent);border-radius:6px;color:var(--muted)}
+  code{background:var(--code);padding:2px 6px;border-radius:4px;font-size:.88em;
+    font-family:"SF Mono",ui-monospace,Menlo,Consolas,monospace;color:#d7e2ff}
+  a{color:var(--accent);text-decoration:none;border-bottom:1px solid rgba(91,157,255,.4)}
+  a:hover{border-bottom-color:var(--accent)}
+  .docnav{display:flex;gap:12px;flex-wrap:wrap;margin:0 0 24px}
+  .docnav a{display:inline-flex;align-items:center;gap:8px;padding:10px 16px;border:1px solid var(--border);
+    border-radius:10px;background:var(--panel);font-weight:600;border-bottom:1px solid var(--border)}
+  .docnav a:hover{border-color:var(--accent)}
+  .docnav a.here{border-color:var(--accent2);color:var(--accent2);cursor:default}
+  pre{background:var(--code);border:1px solid var(--border);border-radius:10px;
+    padding:16px 18px;overflow:auto;font-family:"SF Mono",ui-monospace,Menlo,Consolas,monospace;
+    font-size:13px;line-height:1.5;color:#cdd6e6}
+  table{width:100%;border-collapse:collapse;margin:14px 0 24px;font-size:15px}
+  th,td{text-align:left;padding:9px 12px;border:1px solid var(--border);vertical-align:top}
+  th{background:#1d2230}
+  td:first-child{color:var(--accent2)}
+  ul{padding-left:22px}
+  .ok{color:var(--accent2)} .warn{color:var(--warn)} .bad{color:#e0726e}
+  .pill{display:inline-block;font-size:12px;padding:2px 9px;border-radius:20px;
+    background:#1d2230;color:var(--accent2);border:1px solid var(--border);margin-left:8px}
+  footer{margin-top:56px;color:var(--muted);font-size:13px;border-top:1px solid var(--border);padding-top:16px}
+  /* ── visual diagrams ── */
+  .diagram{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:22px;margin:18px 0}
+  .diagram .dtitle{font-weight:700;color:var(--accent);margin-bottom:4px;font-size:16px}
+  .diagram .plain{color:var(--muted);font-size:14px;margin:0 0 16px}
+  .dgrow{display:flex;align-items:center;gap:10px;flex-wrap:wrap;justify-content:center}
+  .dgbox{border:2px solid var(--border);border-radius:10px;background:#11151c;padding:10px 14px;text-align:center;min-width:96px}
+  .dgbox .big{font-weight:700;font-size:15px;color:var(--text)}
+  .dgbox .smol{font-size:12px;color:var(--muted);margin-top:4px;line-height:1.4}
+  .dgbox.accent{border-color:var(--accent)} .dgbox.green{border-color:var(--accent2)} .dgbox.warn{border-color:var(--warn)} .dgbox.bad{border-color:#c0504d}
+  .arrow{color:var(--accent);font-size:26px;font-weight:700;line-height:1}
+  .vs{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  .vs .card{border:2px solid var(--border);border-radius:10px;padding:14px;background:#11151c}
+  .vs .card.bad{border-color:#c0504d} .vs .card.good{border-color:var(--accent2)}
+  .vs h4{margin:0 0 10px;font-size:14px}
+  .vs .smol{font-size:13px;color:var(--muted);line-height:1.5}
+  @media (max-width:640px){.vs{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <h1>Photos Gallery Order &amp; Preview Variant</h1>
+  <p class="sub">Session notes — 2026-06-19 · fixing the post-upload gallery order (newest sinking to the bottom), a mid-upload shuffle, the preview image variant (cache reuse), and the default sort order.</p>
+
+  <nav class="docnav">
+    <a href="architecture.md">🏛️ Architecture →</a>
+    <a href="codebase-analysis.md">🔍 Codebase Analysis →</a>
+    <a href="data-flow-diagram.md">🔀 Data Flow Diagram →</a>
+    <a href="canvas.md">🖌️ Canvas →</a>
+    <a href="interaction.md">✋ Interaction →</a>
+    <a href="photo.md">📷 Photo →</a>
+    <a href="shape.md">🔷 Shape →</a>
+    <a href="sticker.md">⭐ Sticker →</a>
+    <a href="text.md">🔤 Text →</a>
+    <a href="react-native-migration-plan.md">📱 React Native Migration Plan →</a>
+    <a href="upload-pipeline.md">⬆️ Upload Pipeline →</a>
+    <a href="session-2026-06-12-upload-pipeline-rework.md">📝 Session: Upload Pipeline Rework (2026-06-12) →</a>
+    <a href="image-loading-optimization-2026-06-16.html">🖼️ Image Loading Optimization (2026-06-16) →</a>
+    <a href="canvas-interaction-performance-2026-06-16.html">🎯 Canvas Interaction Performance (2026-06-16) →</a>
+    <a href="resize-imperative-performance-2026-06-16.html">📐 Resize Imperative Performance (2026-06-16) →</a>
+    <a href="photobook-full-cover-sync-2026-06-19.html">🅿️ Photobook Full Cover Sync (2026-06-19) →</a>
+    <a class="here">🗂️ Photos Gallery Order &amp; Preview (2026-06-19) — you are here</a>
+    <a href="customer-autosave-activity-gate-2026-06-19.html">💾 Customer Auto-Save Activity Gate (2026-06-19) →</a>
+    <a href="canvas-rulers-2026-06-24.html">📏 Canvas Rulers (2026-06-24) →</a>
+  </nav>
+  <blockquote>The sidebar <strong>Photos gallery</strong> showed freshly uploaded images in the wrong order after a batch upload (newest sank to the bottom / "only the smaller images glitch"), plus a follow-up <em>mid-upload shuffle</em>. Two smaller asks rode along: the product preview was downloading the heavy <code>large</code> variant instead of a cached one, and the default sort needed to flip to "Earliest added". Companion to the Upload Pipeline notes (<code>docs/upload-pipeline.md</code>).</blockquote>
+
+  <h2>TL;DR</h2>
+  <table>
+    <tr><th>Problem</th><th>Fix</th></tr>
+    <tr><td>After a &gt;1-page batch upload, newest images sank to the <strong>bottom</strong>; scrolling "fixed" it. Backend order (<code>_id</code> desc) was <span class="ok">correct</span> — the bug was the gallery merge.</td><td>Page-1 refetch returns only the newest ~20. Completed uploads older than page-1's newest stayed as <strong>bridge tiles</strong> and the merge <strong>pinned ALL pending to the top</strong>, shoving older-but-finished uploads above newer ones. Now completed bridge tiles are <strong>sorted into the backend list by <code>_id</code></strong>, not pinned.</td></tr>
+    <tr><td>"Only the smaller images glitch"</td><td>Smaller images resize/init faster → land in the stranded older-<code>_id</code> bridge-tile slot, so they were the visible victims of top-pinning. Same root cause.</td></tr>
+    <tr><td>Follow-up: a tile <strong>jumped to the end of the batch</strong> mid-upload, then settled correctly.</td><td><code>_id</code>-sorting completed tiles <em>while siblings were still uploading</em> made each finished tile jump out of its pinned slot. Now the merge is <strong>two-phase</strong>: stable selection-order pin <strong>while actively uploading</strong>, one <code>_id</code>-sort resettle <strong>after the batch settles</strong>.</td></tr>
+    <tr><td>Product <strong>preview</strong> fetched <code>large</code> — a second, heavy download, no cache reuse</td><td>Preview now uses <strong><code>medium</code></strong> (the canvas's progressive baseline + preload for current ±1), so the active spread loads from cache; far pages fetch <code>medium</code> (≈½ of <code>large</code>) once. Export still uses <code>large</code>.</td></tr>
+    <tr><td>Default gallery sort was "Recently added"</td><td>Flipped default to <strong>"Earliest added"</strong> (<code>added_asc</code>); bumped the <code>localStorage</code> key so the old persisted value doesn't override it.</td></tr>
+  </table>
+
+  <h2>How it was found 🔎 (logging, not guessing)</h2>
+  <div class="diagram">
+    <div class="dtitle">The reasoning said "newest should be on top" — the screenshots disagreed</div>
+    <p class="plain">Every code path <em>should</em> have preserved backend order, which contradicted the user's screenshots. Temporary <code>[ORDER-DEBUG]</code> logs at the three divergence points (batch-refetch effect, <code>getProjectImages</code> replace/append, the <code>galleryImages</code> merge) were the smoking gun:</p>
+    <pre>getProjectImages RESULT  → REPLACE, returnedFirst5: ef25, ef25, ef24…   (backend = newest first ✓)
+galleryImages MERGED     → pinTop:true, pendingCount:11
+   projectImagesFirst5:  ef25, ef25, ef24…    (correct backend order)
+   pendingFirst5:        ee91, ee91, ee92…    (all pending:false, OLDER _ids)
+   mergedFirst8:         eea5, ee97, ee97…    ← OLDER bridge tiles on TOP  ✗</pre>
+    <p class="plain"><code>projectImages</code> was perfectly newest-first; the <strong>merge</strong> put older completed bridge tiles above it. Logs removed after diagnosis.</p>
+  </div>
+
+  <h2>1. The order bug</h2>
+  <div class="diagram">
+    <div class="dtitle">Older-but-finished uploads pinned above newer ones</div>
+    <p class="plain">A batch of &gt;20 images means the oldest-init ones (lowest <code>_id</code>) fall to page 2. Those finished uploads are kept as "bridge tiles" (completed, real <code>serverId</code>, <code>isPending:false</code>) until the refetch absorbs them.</p>
+    <div class="vs">
+      <div class="card bad">
+        <h4>❌ Old merge (pinTop / desc)</h4>
+        <div class="smol"><code>[ ...ALL pending.reverse(), ...projectImages ]</code><br>└─ older page-2 bridge tiles pinned <strong>above</strong> newer page-1 images<br>= newest "sink"; pagination later absorbs them ("scroll fixes it")</div>
+      </div>
+      <div class="card good">
+        <h4>✅ New merge (settled)</h4>
+        <div class="smol">completed bridge tiles <strong>sorted into</strong> the backend list by <code>_id</code><br>└─ each drops into its true position<br>= gallery mirrors the authoritative backend order</div>
+      </div>
+    </div>
+    <p class="plain" style="margin-top:14px"><strong>Why "only smaller images":</strong> small images resize/init fastest → earliest <code>_id</code> → they're exactly the page-2 leftovers that got mis-pinned.</p>
+  </div>
+
+  <h2>2. The fix — two-phase <code>galleryImages</code> merge</h2>
+  <p>In <code>PhotosAction.jsx</code>, the merge branches on <code>stillActive</code> = any pending tile with <code>pendingStatus</code> <code>"queued"</code> or <code>"uploading"</code>. The batch refetch only fires once everything is terminal, so while this is true <code>projectImages</code> is still the pre-batch list.</p>
+  <div class="diagram">
+    <div class="vs">
+      <div class="card">
+        <h4>🟡 While <code>stillActive</code> — mid-upload</h4>
+        <div class="smol">Pin the WHOLE pending group in <strong>stable selection order</strong>:<br><code>pinTop ? [ ...pending.reverse(), ...projectImages ]</code><br><code>: [ ...projectImages, ...pending ]</code><br>No <code>_id</code>-sort → finished tiles don't jump out of their slot.</div>
+      </div>
+      <div class="card good">
+        <h4>🟢 Settled — no active uploads left</h4>
+        <div class="smol">Split leftovers:<br><code>completed</code> (real <code>_id</code>) → sorted INTO backend list by <code>_id</code><br><code>pinned</code> (failed / no-id) → stay pinned (retry)<br>One resettle to authoritative order.</div>
+      </div>
+    </div>
+  </div>
+  <ul>
+    <li><strong><code>byId</code> comparator:</strong> ObjectId hex strings are fixed-length and byte-monotonic, so plain string compare reproduces MongoDB's <code>_id</code> order exactly (<code>asc</code>: <code>x&lt;y?-1:1</code>, <code>desc</code>: <code>x&gt;y?-1:1</code>).</li>
+    <li><strong>Blink-free:</strong> <code>galleryKeyOf</code> gives a bridge tile and its eventual backend tile the <strong>same React key</strong> (<code>pk_&lt;imageId&gt;</code> / <code>serverId</code>→<code>pendingImageId</code>), so React <strong>moves</strong> the node instead of remounting — both the mid-upload pin and the settled resettle are flash-free.</li>
+    <li><strong>One settle:</strong> when the last active upload finishes, the group resettles once from reversed-selection to <code>_id</code> order; the async refetch then lands on an already-sorted list (no second visible move).</li>
+  </ul>
+
+  <h2>3. Preview image variant → <code>medium</code></h2>
+  <table>
+    <tr><th>Renderer</th><th>Variant</th><th>Why</th></tr>
+    <tr><td>Footer thumbnails</td><td><code>small</code></td><td>tiny tiles; <code>small</code> cached for <strong>every</strong> page</td></tr>
+    <tr><td>Canvas (editing)</td><td><code>medium</code> baseline, <code>large</code> only on zoom-in</td><td><code>useProgressiveImage</code>; <code>preloadImages</code> warms <code>medium</code> for active page <strong>± 1</strong></td></tr>
+    <tr><td>Product preview</td><td><span class="bad">large</span> → <strong>medium</strong></td><td>reuses the canvas's cached/decoded <code>medium</code> for the active spread; far pages fetch <code>medium</code> (≈½ of <code>large</code>) once</td></tr>
+    <tr><td>Export / print</td><td><code>large</code> / original (server-side)</td><td>unchanged — output quality unaffected</td></tr>
+  </table>
+  <p>Switched all product-preview <code>&lt;Photo size="large"&gt;</code> to <code>size="medium"</code> (photobook, wall, folding). <code>medium</code> is the sweet spot: sharper than <code>small</code>, cached where you're most likely looking, far lighter than <code>large</code> everywhere.</p>
+
+  <h2>4. Default sort → "Earliest added"</h2>
+  <ul>
+    <li><code>readStoredSortOrder()</code> default fallback flipped <code>added_desc</code> → <strong><code>added_asc</code></strong> (single source for the dropdown, <code>cachedSortOrder</code>, and <code>sortOrderRef</code>).</li>
+    <li><strong><code>SORT_STORAGE_KEY</code> bumped to <code>_v2</code></strong> so a browser that persisted <code>added_desc</code> under the old default doesn't override the new one on reload (resets everyone once; explicit picks persist after).</li>
+    <li>Works with the two-phase merge: for <code>asc</code>, pending pin to the <strong>bottom</strong> mid-upload, then completed tiles sort <code>_id</code>-ascending into the backend list on settle.</li>
+  </ul>
+
+  <h2>5. Files changed</h2>
+  <table>
+    <tr><th>File</th><th>Change</th></tr>
+    <tr><td>tools/photos/PhotosAction.jsx</td><td>Two-phase <code>galleryImages</code> merge (<code>stillActive</code> gate + <code>byId</code> sort of completed bridge tiles); default sort → <code>added_asc</code>; <code>SORT_STORAGE_KEY</code> → <code>_v2</code></td></tr>
+    <tr><td>products-preview/photobook/photoBookPreivewPages.jsx</td><td><code>&lt;Photo&gt;</code> <code>size</code> <code>large</code> → <code>medium</code> (both sides)</td></tr>
+    <tr><td>products-preview/photBookPreview.jsx</td><td><code>&lt;Photo&gt;</code> <code>size</code> <code>large</code> → <code>medium</code></td></tr>
+    <tr><td>products-preview/WallPreview.jsx</td><td><code>&lt;Photo&gt;</code> <code>size</code> <code>large</code> → <code>medium</code> (both)</td></tr>
+    <tr><td>products-preview/folding/FoldingLayoutPreivewPages.jsx</td><td><code>&lt;Photo&gt;</code> <code>size</code> <code>large</code> → <code>medium</code> (both)</td></tr>
+    <tr><td>CLAUDE.md</td><td>Updated "Photos Gallery Sort" + optimistic-placement notes (two-phase merge, new default)</td></tr>
+  </table>
+
+  <h2>6. Gotchas (do not regress)</h2>
+  <ul>
+    <li><strong>Do NOT re-pin all completed tiles to the top.</strong> The backend <code>_id</code> order is authoritative; completed bridge tiles MUST be <code>_id</code>-sorted into the backend list, or &gt;1-page batches scramble again.</li>
+    <li><strong>Do NOT <code>_id</code>-sort completed tiles while the batch is still actively uploading</strong> — that's the mid-upload shuffle. Keep the <code>stillActive</code> stable-pin phase.</li>
+    <li><strong><code>galleryKeyOf</code> must stay stable</strong> (same key for bridge tile ↔ backend tile) — it's what makes the move blink-free; an array-index fallback would remount and flash.</li>
+    <li><strong>Preview uses <code>medium</code>, export uses <code>large</code>.</strong> Don't "fix" the preview back to <code>large</code> — that re-introduces the heavy second download.</li>
+    <li><span class="warn">Known edge (not fixed):</span> starting a NEW batch before scrolling to absorb a prior &gt;1-page batch's leftover bridge tiles re-pins those older completed tiles on top during the new upload (self-heals on settle). Fixing needs <code>batchId</code> threaded into the merge — deferred until reported.</li>
+  </ul>
+
+  <h2>7. Verification checklist</h2>
+  <ul>
+    <li>Upload <strong>&gt;20</strong> images: during upload no tile jumps to the end of the batch; after completion the order matches the backend and <strong>scrolling does not reshuffle</strong>.</li>
+    <li>"Recently added": newest stay at the <strong>top</strong> after completion. "Earliest added": newest at the <strong>bottom</strong>.</li>
+    <li>Upload→backend handoff has <strong>no flash/remount</strong> (stable keys).</li>
+    <li>Preview (DevTools → Network): active spread images served from <strong>cache</strong> as <code>..._medium.jpg</code>; far pages fetch <code>..._medium.jpg</code> once; <strong>no <code>..._large.jpg</code></strong> from the preview.</li>
+    <li>Fresh browser (no <code>localStorage</code>): default sort shows <strong>"Earliest added"</strong>.</li>
+    <li>Export still renders from <code>large</code>/original (output unchanged).</li>
+  </ul>
+
+  <footer>Photo-Editors · photos gallery order &amp; preview variant · 2026-06-19</footer>
+
+</div>
+</body>
+</html>

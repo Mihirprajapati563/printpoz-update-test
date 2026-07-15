@@ -1,0 +1,57 @@
+appId: com.printpoz.photoeditor
+productName: Photo Editor
+copyright: Copyright © 2026 Printpoz
+extends: null
+
+
+# IMPORTANT: buildResources must NOT be the default "build" dir — that name is used by
+# Create React App for the renderer output. Keep installer assets (icons) separate.
+directories:
+  output: release
+  buildResources: build-resources
+
+files:
+  - dist-electron/**/*
+  - build/**/*
+  - package.json
+
+asar: true
+
+# Add real icons at build-resources/icon.ico (Win) and build-resources/icon.icns (Mac)
+# before public release; electron-builder uses a default Electron icon if omitted.
+win:
+  icon: build-resources/icon.png
+  target:
+    - nsis
+
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+
+mac:
+  icon: build-resources/icon.png
+  target:
+    - dmg
+  category: public.app-category.graphics-design
+  hardenedRuntime: true
+  entitlements: build-resources/entitlements.mac.plist
+  entitlementsInherit: build-resources/entitlements.mac.plist
+  # Notarization runs automatically when CSC_LINK + CSC_KEY_PASSWORD (Developer ID
+  # cert) and APPLE_ID + APPLE_APP_SPECIFIC_PASSWORD + APPLE_TEAM_ID env vars are
+  # set in CI. Without them the build is unsigned and CANNOT auto-update on macOS.
+  notarize: false
+
+linux:
+  icon: build-resources/icon.png
+  target:
+    - AppImage
+  category: Graphics
+
+# Auto-update feed. electron-updater reads latest.yml / latest-mac.yml / latest-linux.yml
+# from the GitHub Release for this repo. FILL IN owner/repo before releasing.
+# Not active until initAutoUpdater() is uncommented in electron/main/index.ts.
+publish:
+  provider: github
+  owner: Mihirprajapati563
+  repo: printpoz-update-test
