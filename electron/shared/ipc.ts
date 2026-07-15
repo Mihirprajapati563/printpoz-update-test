@@ -65,6 +65,8 @@ export const CHANNELS = {
   themePacksSaveManifest: "themePacks:saveManifest",
   themePacksDelete: "themePacks:delete",
   themePacksUrlMap: "themePacks:urlMap",
+  // renderer -> main: re-run the update check (Retry button)
+  updateCheck: "update:check",
   // events (main -> renderer)
   menuEvent: "menu:event",
   updateStatus: "update:status",
@@ -442,6 +444,7 @@ export interface DesktopApi {
   assetsCache: AssetsCacheApi;
   imageCache: ImageCacheApi;
   themePacks: ThemePacksApi;
+  checkForUpdate(): Promise<void>;
   onMenu(cb: (event: MenuEvent) => void): () => void;
   onUpdateStatus(cb: (status: UpdateStatus, progress?: number) => void): () => void;
 }

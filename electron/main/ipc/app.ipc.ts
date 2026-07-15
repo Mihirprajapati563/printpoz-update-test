@@ -1,6 +1,7 @@
 import { ipcMain, shell } from "electron";
 import { CHANNELS } from "../../shared/ipc";
 import { resolveConfig } from "../config";
+import { triggerUpdateCheck } from "../updater";
 
 export function registerAppIpc(): void {
   // Synchronous config read — preload calls this once at startup so the renderer can
@@ -24,6 +25,11 @@ export function registerAppIpc(): void {
       return { ok: false as const, error: "invalid url" };
     }
     await shell.openExternal(url);
+    return { ok: true as const, data: undefined };
+  });
+
+  ipcMain.handle(CHANNELS.updateCheck, async () => {
+    triggerUpdateCheck();
     return { ok: true as const, data: undefined };
   });
 }

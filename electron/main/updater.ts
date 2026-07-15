@@ -14,8 +14,6 @@ import { logger } from "./lib/logger";
 //     -> Once you HAVE an Apple Developer cert, delete initMacNotifyOnly and let
 //        macOS fall through to initSilentAutoUpdater like the others.
 //
-// NOTE: not called anywhere yet — initAutoUpdater() is commented out in index.ts.
-//
 // Feed for all platforms is the GitHub Release for this repo (electron-builder.yml
 // `publish: github`). FILL IN owner/repo below (must match electron-builder.yml).
 const GH_OWNER = "Mihirprajapati563";
@@ -27,10 +25,19 @@ const CHECK_INTERVAL_MS = 6 * 60 * 60 * 1000;
 // (the status is a fire-and-forget push; a missed one only reappears next interval).
 const MAC_FIRST_CHECK_DELAY_MS = 15 * 1000;
 
+// The platform-appropriate check fn, set at init. `triggerUpdateCheck()` (the
+// renderer "Retry" button) re-runs it.
+let activeCheck: (() => void) | null = null;
+
 function sendStatus(status: UpdateStatus, progress?: number): void {
   for (const w of BrowserWindow.getAllWindows()) {
     if (!w.isDestroyed()) w.webContents.send(CHANNELS.updateStatus, status, progress);
   }
+}
+
+// Re-run the update check on demand (renderer Retry button, via update:check IPC).
+export function triggerUpdateCheck(): void {
+  activeCheck?.();
 }
 
 export function initAutoUpdater(): void {
@@ -83,6 +90,7 @@ function initSilentAutoUpdater(): void {
     autoUpdater.checkForUpdates().catch((err) => {
       logger.error("checkForUpdates failed", { err: String(err) });
     });
+  activeCheck = check;
   check();
   setInterval(check, CHECK_INTERVAL_MS);
 }
@@ -110,6 +118,7 @@ function initMacNotifyOnly(): void {
       sendStatus("error");
     }
   };
+  activeCheck = () => void check();
   setTimeout(check, MAC_FIRST_CHECK_DELAY_MS);
   setInterval(check, CHECK_INTERVAL_MS);
 }

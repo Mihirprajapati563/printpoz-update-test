@@ -1,24 +1,13 @@
 import { useEffect, useState } from "react";
 import { desktop } from "../desktop";
 
-// Always-visible version + live auto-update status badge (bottom-left).
-// TEMPORARY debug aid — shows the installed version and every updater stage
-// (checking / available / downloading % / restart-to-apply) so you can watch a
-// silent update happen. Remove once auto-update is verified in production.
-// No-op on the web (desktop is null). Version comes from app.getVersion() via
-// getInfo(); status is pushed from electron/main/updater.ts over update:status.
+// Auto-update status badge (bottom-left). Shows ONLY when there's something to
+// act on or watch — downloading, update ready, or a failure. Stays hidden when
+// idle / up to date (no persistent pill). On failure it offers Retry (re-runs the
+// check) and Update manually (opens the releases page). No-op on the web.
 //
-// Must match electron-builder.yml `publish` owner/repo (mac manual-download link).
+// Must match electron-builder.yml `publish` owner/repo (manual-download link).
 const RELEASES_URL = "https://github.com/Mihirprajapati563/printpoz-update-test/releases/latest";
-
-const STATUS_TEXT = {
-  checking: "Checking for updates…",
-  available: "Update available…",
-  downloading: "Downloading update",
-  downloaded: "Update ready — restart to apply",
-  "not-available": "Up to date",
-  error: "Update check failed",
-};
 
 export default function UpdateBanner() {
   const [version, setVersion] = useState("");
@@ -45,12 +34,32 @@ export default function UpdateBanner() {
     });
   }, []);
 
-  // Only render inside the desktop app (version present).
-  if (!version) return null;
+  const retry = () => {
+    setStatus("checking");
+    desktop?.checkForUpdate?.().catch(() => setStatus("error"));
+  };
 
-  const isMacAvailable = status === "available" && platform === "darwin";
-  let statusLabel = status ? STATUS_TEXT[status] : "";
-  if (status === "downloading" && progress != null) statusLabel = `Downloading update ${progress}%`;
+  // Hidden unless there's something actionable/worth showing.
+  const visible =
+    status === "available" || status === "downloading" || status === "downloaded" || status === "error";
+  if (!visible) return null;
+
+  const isMac = platform === "darwin";
+  let label = "";
+  if (status === "available") label = isMac ? "Update available" : "Update available…";
+  else if (status === "downloading") label = `Downloading update${progress != null ? ` ${progress}%` : "…"}`;
+  else if (status === "downloaded") label = "Update ready — restart to apply";
+  else if (status === "error") label = "Update failed";
+
+  const btn = {
+    padding: "3px 10px",
+    borderRadius: 12,
+    border: "none",
+    color: "#fff",
+    cursor: "pointer",
+    fontWeight: 600,
+    fontSize: 12,
+  };
 
   return (
     <div
@@ -64,38 +73,33 @@ export default function UpdateBanner() {
         gap: 10,
         padding: "6px 12px",
         borderRadius: 20,
-        background: "rgba(31,41,55,0.92)",
+        background: status === "error" ? "rgba(153,27,27,0.95)" : "rgba(31,41,55,0.92)",
         color: "#fff",
         fontSize: 12,
         fontFamily: "system-ui, sans-serif",
         boxShadow: "0 2px 10px rgba(0,0,0,0.25)",
-        pointerEvents: "auto",
       }}
     >
-      <span style={{ fontWeight: 600 }}>v{version}</span>
-      {statusLabel && (
-        <>
-          <span style={{ opacity: 0.5 }}>·</span>
-          <span style={{ opacity: 0.9 }}>{statusLabel}</span>
-        </>
-      )}
-      {isMacAvailable && (
-        <button
-          type="button"
-          onClick={() => desktop?.openExternal(RELEASES_URL)}
-          style={{
-            padding: "3px 10px",
-            borderRadius: 12,
-            border: "none",
-            background: "#3b82f6",
-            color: "#fff",
-            cursor: "pointer",
-            fontWeight: 600,
-            fontSize: 12,
-          }}
-        >
+      {version && <span style={{ fontWeight: 600 }}>v{version}</span>}
+      <span style={{ opacity: 0.9 }}>{label}</span>
+
+      {/* Mac can't self-install — the only action is manual download. */}
+      {status === "available" && isMac && (
+        <button type="button" onClick={() => desktop?.openExternal(RELEASES_URL)} style={{ ...btn, background: "#3b82f6" }}>
           Download
         </button>
+      )}
+
+      {/* Failure: let the user retry or grab the installer manually. */}
+      {status === "error" && (
+        <>
+          <button type="button" onClick={retry} style={{ ...btn, background: "#2563eb" }}>
+            Retry
+          </button>
+          <button type="button" onClick={() => desktop?.openExternal(RELEASES_URL)} style={{ ...btn, background: "rgba(255,255,255,0.2)" }}>
+            Update manually
+          </button>
+        </>
       )}
     </div>
   );

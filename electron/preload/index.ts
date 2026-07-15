@@ -124,6 +124,7 @@ const api: DesktopApi = {
     delete: (themeId: string) => invoke<void>(CHANNELS.themePacksDelete, themeId),
     urlMap: () => invoke<Record<string, string>>(CHANNELS.themePacksUrlMap),
   },
+  checkForUpdate: () => invoke<void>(CHANNELS.updateCheck),
   onMenu: (cb: (event: MenuEvent) => void) => {
     const listener = (_: unknown, event: MenuEvent) => cb(event);
     ipcRenderer.on(CHANNELS.menuEvent, listener);
