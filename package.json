@@ -1,6 +1,6 @@
 {
   "name": "printpoz-desktop-designer",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "private": true,
   "description": "Desktop edition (Electron + TypeScript) of the Printpoz/CODNIX photo editor.",
   "author": "Printpoz / CODNIX",
