@@ -53,6 +53,7 @@ import { decompressFromBase64 } from "../../library/utils/common-functions/index
 import { scaleSourcePagesToTarget } from "../../library/utils/common-functions/scaleDesignPages.js";
 import { EDITOR_TYPES } from "../../library/utils/constants/index.js";
 import BlankImagePlaceholder from "../../assets/images/blankImagePlaceholder.png";
+import DesignThumbnail from "../../common-components/DesignThumbnail.jsx";
 
 // Saved-design pages_c decompresses to a BARE pages array (savedDesigns.js
 // stores `compressData(JSON.stringify(pages))`), whereas theme-sourced pages_c
@@ -270,17 +271,12 @@ export const ProjectsList = () => {
                 title={`Apply "${meta.name}"`}
                 onClick={() => handleApplyClick(meta)}
               >
-                <img
-                  src={meta.thumbnail || BlankImagePlaceholder}
+                <DesignThumbnail
+                  thumbnail={meta.thumbnail}
+                  scopeId={meta.id}
                   alt={meta.name}
-                  loading="lazy"
-                  style={{
-                    width: "100%",
-                    aspectRatio: "1 / 1",
-                    objectFit: "contain",
-                    background: "#f7f7f7",
-                    display: "block",
-                  }}
+                  fallbackSrc={BlankImagePlaceholder}
+                  style={{ aspectRatio: "1 / 1", background: "#f7f7f7" }}
                 />
                 <div className="px-2 py-1">
                   <div

@@ -110,11 +110,20 @@ export const Workspace = styled.div`
   flex: 1;
   display: grid;
   grid-template-columns: clamp(280px, 24vw, 360px) 1fr;
+  /* Bound the row to the container height. Without this the single implicit row
+     defaults to auto and grows to the tallest pane's CONTENT height, so a long
+     "Your Projects" list stretches the sidebar past the viewport and gets clipped
+     by Page overflow:hidden — the sidebar showed only the first few designs with
+     no scroll. minmax(0,1fr) forces a full-height row (min 0 so children can
+     shrink), which lets SidebarBody / Content own their overflow-y and scroll. */
+  grid-template-rows: minmax(0, 1fr);
   min-height: 0; /* allow children to own their own scroll */
   width: 100%;
 
   @media (max-width: 900px) {
     grid-template-columns: 1fr;
+    /* Stacked: sidebar takes its own (capped) height, content scrolls below. */
+    grid-template-rows: auto minmax(0, 1fr);
   }
 `;
 
@@ -440,8 +449,9 @@ export const SavedConfirm = styled.div`
     font-weight: 700;
     cursor: pointer;
   }
+  button:disabled { opacity: 0.5; cursor: default; }
   .yes { background: ${tokens.ink}; color: #fff; }
-  .yes:hover { background: #000; }
+  .yes:hover:not(:disabled) { background: #000; }
   .no { background: ${tokens.hover}; color: ${tokens.ink2}; }
   .no:hover { background: #e6e6e6; }
 `;

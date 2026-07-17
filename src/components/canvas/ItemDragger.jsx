@@ -105,6 +105,16 @@ const ItemDragger = () => {
   // the imperative rotate, so onRender writes the live angle straight to the
   // ∠° readout DOM node (gated by this) and it re-syncs to the committed value on end.
   const isRotatingRef = useRef(false);
+  // True ONLY while the rotation-sync effect is imperatively driving Moveable's
+  // rotatable able to make the selection box follow an EXTERNAL rotation change
+  // (Position panel presets / slider / input). In react-moveable an instant
+  // request() runs the FULL onRotateStart→onRender→onRotateEnd cycle, so without
+  // this guard onRotateEnd would flushOnRenderNow() and COMMIT a Moveable-measured
+  // (radian round-tripped, pivot-adjusted) angle back to Redux — overwriting the
+  // exact value the panel just set with a slightly/wildly different one (the
+  // "picked 45° but the slider snaps to another value" bug). While this is true
+  // the rotate handlers no-op, so the sync moves the BOX only, never the DATA.
+  const isSyncingRotationRef = useRef(false);
   // onRender dispatch throttling: apply the visual transform on every frame but
   // coalesce the redux dispatch to one per animation frame. This breaks the
   // flushSync synchronous re-render → re-fire loop ("Maximum update depth") and
@@ -311,25 +321,34 @@ const ItemDragger = () => {
   }, [activeObjectId]);
 
   const activeRotation = getActiveCanvasObjProps?.transform?.rotation;
+  // Reposition Moveable's selection box/handle when the rotation changes from an
+  // EXTERNAL source (Position-panel presets / slider / custom input). We ONLY
+  // updateRect() here — we must NOT replay the angle through
+  // mv.request("rotatable", …). That request fires a full SYNTHETIC rotate gesture
+  // whose onRotateEnd → flushOnRender commits Moveable's matrix-derived angle BACK
+  // to redux, and that round-trip returned the WRONG angle (e.g. click 225° →
+  // committed 135°), silently overwriting the clean preset value — the "clicking a
+  // preset applies a different angle" bug. The object is already rendered at the
+  // correct angle by React (redux → <g> style.transform); updateRect just
+  // re-measures the selection box so the handle follows.
   useEffect(() => {
-    // Skip during ANY live gesture (drag/rotate/resize) or inner-image pan.
     if (isGesturingRef.current || isResizingRef.current || isDragger) return undefined;
-    // Skip when this rotation was produced by a Moveable gesture itself — Moveable
-    // already holds this angle, so re-driving its rotatable able here is redundant
-    // AND races the gesture teardown (stranded able / null datas → the spin+crash).
-    // Only an EXTERNAL change (Position-panel slider/input) differs from the last
-    // gesture value, which is precisely when this sync must run.
     if (activeRotation === lastGestureRotationRef.current) return undefined;
     const mv = moveableRef.current;
     const target = resolvedSingleTarget;
     if (!mv || !target || !document.body.contains(target)) return undefined;
     if (!Number.isFinite(activeRotation)) return undefined;
     const rafId = requestAnimationFrame(() => {
+      // request(..., true) is SYNCHRONOUS and fires the whole rotate event cycle;
+      // flag it so our onRotate* handlers skip their Redux commits and this stays
+      // a pure visual box update. Cleared in finally so a throw can't strand it.
       try {
+        isSyncingRotationRef.current = true;
         mv.updateRect();
-        mv.request("rotatable", { rotate: activeRotation }, true);
       } catch (e) {
         /* Moveable internal state not ready — ignore rather than crash. */
+      } finally {
+        isSyncingRotationRef.current = false;
       }
     });
     return () => cancelAnimationFrame(rafId);
@@ -1481,6 +1500,12 @@ const ItemDragger = () => {
     if (isDragger) {
       return false;
     }
+    // The rotation-sync effect is only nudging the selection box to follow an
+    // external angle; the target is already rotated by React from Redux, so skip
+    // the imperative transform + stash (committing them would fight the panel).
+    if (isSyncingRotationRef.current) {
+      return false;
+    }
     // Apply the visual transform immediately (smooth), but THROTTLE the redux
     // dispatch to one per animation frame. Dispatching on every Moveable render
     // (with flushSync) re-rendered synchronously and made Moveable re-measure +
@@ -1738,11 +1763,18 @@ const ItemDragger = () => {
           onDrag={onDrag}
           onDragEnd={onDragend}
           onRotateStart={(e) => {
+            // Sync-driven (Position-panel) rotate: don't enter gesture mode — it's
+            // a box-only visual update, not a user gesture, and must not commit.
+            if (isSyncingRotationRef.current) return;
             isGesturingRef.current = true;
             isRotatingRef.current = true;
             setIsUpdatingObject(true);
           }}
           onRotateEnd={(e) => {
+            // Sync-driven rotate ends here too (instant request fires the full
+            // cycle). Skip the commit/history/normalize so the panel's exact value
+            // is preserved — the box already followed via Moveable's own render.
+            if (isSyncingRotationRef.current) return;
             // call function to maintain history
             // setupRotationPosition();
             endGesture();

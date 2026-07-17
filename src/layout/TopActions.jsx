@@ -52,6 +52,7 @@ import { MdSelectAll } from "react-icons/md";
 import { isMobile } from "react-device-detect";
 import RulerControl from "./RulerControl";
 import CoverSpineControl from "./CoverSpineControl";
+import { supportsCoverSettings } from "../library/utils/jsons/coverSettingsConfig";
 export const TopActions = () => {
   const dispatch = useDispatch();
   const minPages = useSelector(getMinPages);
@@ -105,6 +106,19 @@ export const TopActions = () => {
       setAllowAddPage(false);
       setAllowCopyPage(false);
       setAllowDeletePage(false);
+    }
+
+    // Calendars are inherently multi-page (one page per month, plus cover pages),
+    // so customers must be able to manage pages too — the generic branch above
+    // only grants Add/Copy/Delete to photobook/layflat/print or to staff users,
+    // which hid all three for a customer opening a Calendar theme. Calendars have
+    // no photobook/layflat cover-page guards (deletePage/copySelectedPage gate
+    // those by editor type, and hidePageActions is false for calendars), so
+    // enabling all three is safe here.
+    if (editorType === EDITOR_TYPES.CALENDER) {
+      setAllowAddPage(true);
+      setAllowCopyPage(true);
+      setAllowDeletePage(true);
     }
 
     if (
@@ -501,8 +515,10 @@ export const TopActions = () => {
         </Box>
 
         {/* Cover & spine — customer-facing (admins use the Setting tab, which is
-            hidden from customers). Self-gates to photobook / layflat. */}
-        {userType === USER_TYPES.CUSTOMER && (
+            hidden from customers). Only photobook / layflat have cover settings;
+            gate the WRAPPER too (not just CoverSpineControl, which self-returns
+            null) so other categories don't render an empty toolbar box. */}
+        {userType === USER_TYPES.CUSTOMER && supportsCoverSettings(editorType) && (
           <Box className="icon-18 me-2">
             <ActionWrapperBox>
               <CoverSpineControl />

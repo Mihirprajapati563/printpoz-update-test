@@ -15,6 +15,8 @@ import {
 const MAX_ASSET_BYTES = 40 * 1024 * 1024;
 // A theme.json holds every variant's compressed pages — generous but bounded.
 const MAX_THEME_JSON_BYTES = 64 * 1024 * 1024;
+// A theme references far fewer urls than this; the cap just bounds the payload.
+const MAX_MISSING_URLS = 2000;
 
 function isSaveInput(v: unknown): v is SaveThemePackInput {
   if (!v || typeof v !== "object") return false;
@@ -28,7 +30,15 @@ function isSaveInput(v: unknown): v is SaveThemePackInput {
     Buffer.byteLength(o.themeJson, "utf8") <= MAX_THEME_JSON_BYTES &&
     Array.isArray(o.assets) &&
     Array.isArray(o.sizes) &&
-    Array.isArray(o.fontUrls)
+    Array.isArray(o.fontUrls) &&
+    // `complete` decides whether the UI offers Resume or claims the theme is
+    // available offline, so it must be stated outright. Left unvalidated, a
+    // caller that simply forgot it would silently publish a half-downloaded
+    // pack as finished — the exact bug the resume feature exists to fix.
+    typeof o.complete === "boolean" &&
+    Array.isArray(o.missing) &&
+    o.missing.length <= MAX_MISSING_URLS &&
+    o.missing.every((u) => typeof u === "string")
   );
 }
 

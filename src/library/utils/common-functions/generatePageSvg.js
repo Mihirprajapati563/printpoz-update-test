@@ -23,6 +23,7 @@ import { USER_TYPES, EDITOR_TYPES } from "../constants/index.js";
 import { Fontfamilies } from "../../utils/jsons/commonJSON.js";
 import {
     getMonthName,
+    getDayNames,
     convertNumberToLanguage,
 } from "../../../components/calendar/DynamicCalendar";
 import { getMonthYear } from "./index.js";
@@ -583,18 +584,145 @@ function renderShapeObject(item) {
   </g>`;
 }
 
+// Local replica of DynamicCalendar's (non-exported) week builder. Keep in sync
+// with src/components/calendar/DynamicCalendar.jsx generateCalendarData.
+function generateCalendarData(month, year) {
+    const daysInMonth = new Date(year, month, 0).getDate();
+    const startDay = new Date(year, month - 1, 1).getDay();
+    const weeks = [];
+    let currentDay = 1;
+    for (let week = 0; currentDay <= daysInMonth; week++) {
+        weeks[week] = [];
+        for (let day = 0; day < 7; day++) {
+            if (week === 0 && day < startDay) weeks[week].push(null);
+            else if (currentDay <= daysInMonth) weeks[week].push(currentDay++);
+            else weeks[week].push(null);
+        }
+    }
+    return weeks;
+}
+
 /**
- * Render a calendar object to SVG (simplified - actual calendar rendering is complex)
+ * Render a calendar object to SVG — a real month grid (header row + day cells),
+ * ported from the DynamicCalendar component so saved-design thumbnails show an
+ * actual calendar instead of a "Calendar" placeholder. generatePageSvg is used
+ * ONLY by the thumbnail generator (real exports clone the live canvas SVG via
+ * Canvas.getSVGDataToExport), so this affects thumbnails only. Colour/font
+ * values are escaped as attributes; the thumbnail renderer also sanitises the
+ * whole SVG before inlining. Multi-page month sequencing is approximated by
+ * `pageIndex` (single calendar per rendered page — good enough for a preview).
  */
 function renderCalendarObject(item, pageIndex, calendarSettings) {
-    // Calendar rendering is complex and depends on DynamicCalendar component logic
-    // For data-driven generation, we need to replicate the calendar grid logic
-    // This is a placeholder that would need the full calendar rendering implementation
-    const { width, height } = item;
+    const width = Number(item.width);
+    const height = Number(item.height);
+    if (!(width > 0) || !(height > 0)) {
+        return `<g class="calendar-item fade-animate">
+    <rect x="0" y="0" width="${Math.abs(width) || 0}" height="${Math.abs(height) || 0}" fill="transparent" stroke="#ccc" stroke-width="1"/>
+  </g>`;
+    }
+
+    // Merge global + per-object settings exactly like DynamicCalendar (object
+    // settings win; blank values are ignored).
+    const calSet = {
+        ...(calendarSettings || {}),
+        ...Object.fromEntries(
+            Object.entries(item?.calendarSettings || {}).filter(
+                ([, v]) => v !== "" && v !== null && v !== undefined
+            )
+        ),
+    };
+
+    const weeksColumns = calSet.weeksColumns || 1;
+    const cellMargin = calSet.cellMargin ? Number(calSet.cellMargin) : 0;
+    let startMonth = parseInt(calSet.startMonth, 10);
+    let startYear = parseInt(calSet.startYear, 10);
+    if (!Number.isFinite(startMonth)) startMonth = 1;
+    if (!Number.isFinite(startYear)) startYear = new Date().getFullYear();
+
+    const { month, year } = getMonthYear(startMonth, startYear, pageIndex || 0);
+    const weeks = generateCalendarData(month, year);
+    const dayNames = getDayNames(calSet.language ? calSet.language : "en");
+
+    const alternateColor = calSet.alternativeBgColor || "#FFFFFF";
+    const textColor = calSet.textColor || "#000000";
+    const headerColor = calSet.headerBgColor || "#cccccc";
+    const headerTextColor = calSet.headerTextColor || "#000000";
+    const weekendDayNameTextColor = calSet.weekendTextColor || headerTextColor;
+    const weekendTextColor = calSet.weekendTextColor || textColor;
+    const fontSize = calSet.fontSize ? Number(calSet.fontSize) : 40;
+    const fontFamily = calSet.fontFamily || "Arial";
+    const fontWeight = calSet.fontWeight || "normal";
+    const borderWidth = calSet.borderWidth ? Number(calSet.borderWidth) : 1;
+    const borderColor = calSet.borderColor || "#000000";
+    const borderRadius = calSet.borderRadius ? Number(calSet.borderRadius) : 0;
+
+    const totalWeeks = weeks.length;
+    const effectiveColumns = Math.min(weeksColumns, totalWeeks || 1);
+    const maxRows = Math.ceil(totalWeeks / effectiveColumns) || 1;
+    const cellWidth = width / (7 * effectiveColumns);
+    const cellHeight = height / (maxRows + 1);
+    const colStride = 7 * cellWidth + 6 * cellMargin;
+    const svgWidth = effectiveColumns * colStride + borderWidth * 2;
+    const svgHeight =
+        (maxRows + 1) * (cellHeight + cellMargin) + fontSize / 2 + borderWidth * 2;
+
+    const dayLabel = (day) => {
+        switch (calSet.dayNameFormat) {
+            case "tiny": return day.tinyName;
+            case "short": return day.shortName;
+            case "full": return day.fullName;
+            default: return day.shortName;
+        }
+    };
+
+    // Day-name header row (repeated per column). Plain nested loops (no closures
+    // created in a loop) so the accumulator isn't captured by a loop function.
+    const headerParts = [];
+    for (let colIndex = 0; colIndex < effectiveColumns; colIndex++) {
+        for (let dayIndex = 0; dayIndex < dayNames.length; dayIndex++) {
+            const day = dayNames[dayIndex];
+            const x = dayIndex * (cellWidth + cellMargin) + colIndex * colStride;
+            const y = cellMargin + fontSize / 2 + borderWidth / 2;
+            const rectFill =
+                dayIndex === 0 && calSet.weekendBgColor ? calSet.weekendBgColor : headerColor;
+            const labelFill = dayIndex === 0 ? weekendDayNameTextColor : headerTextColor;
+            headerParts.push(`<g class="cal-header" transform="translate(${borderWidth}, ${-cellMargin})">
+      <rect class="cal-header" x="${x}" y="${y}" width="${cellWidth}" height="${cellHeight}" fill="${escapeXml(rectFill)}" stroke="${escapeXml(borderColor)}" stroke-width="${borderWidth}" rx="${borderRadius}" ry="${borderRadius}"/>
+      <text class="cal-header__label" x="${x + cellWidth / 2}" y="${y + cellHeight / 3 + fontSize / 2}" alignment-baseline="middle" text-anchor="middle" font-size="${fontSize}" font-family="${escapeXml(fontFamily)}" font-weight="${escapeXml(fontWeight)}" fill="${escapeXml(labelFill)}">${escapeXml(dayLabel(day))}</text>
+    </g>`);
+        }
+    }
+    const headers = headerParts.join("");
+
+    // Day cells
+    let cells = "";
+    weeks.forEach((week, weekIndex) => {
+        const weekColIndex = weekIndex % effectiveColumns;
+        const rowInCol = Math.floor(weekIndex / effectiveColumns);
+        week.forEach((day, dayIndex) => {
+            const x = dayIndex * (cellWidth + cellMargin) + weekColIndex * colStride;
+            const y =
+                (rowInCol + 1) * (cellHeight + cellMargin) + fontSize / 2 + borderWidth / 2;
+            let fillColor =
+                (dayIndex + weekIndex) % 2 === 0
+                    ? calSet.backgroundColor || "#FFFFFF"
+                    : alternateColor;
+            if (dayIndex === 0 && calSet.weekendBgColor) fillColor = calSet.weekendBgColor;
+            const numberFill = dayIndex === 0 ? weekendTextColor : textColor;
+            cells += `<g class="cal-cell-${weekIndex}-${dayIndex}" transform="translate(${borderWidth}, ${borderWidth})">
+      <rect class="cal-cell-bg" x="${x}" y="${y}" width="${cellWidth}" height="${cellHeight}" fill="${escapeXml(fillColor)}" stroke="${escapeXml(borderColor)}" stroke-width="${borderWidth}" rx="${borderRadius}" ry="${borderRadius}"/>${day
+                ? `
+      <text class="cal-cell-number" x="${x + cellWidth / 2}" y="${y + cellHeight / 3 + fontSize / 2}" alignment-baseline="middle" text-anchor="middle" fill="${escapeXml(numberFill)}" font-size="${fontSize}" font-family="${escapeXml(fontFamily)}" font-weight="${escapeXml(fontWeight)}">${escapeXml(String(convertNumberToLanguage(day, calSet.language ? calSet.language : "en")))}</text>`
+                : ""}
+    </g>`;
+        });
+    });
 
     return `<g class="calendar-item fade-animate">
-    <rect x="0" y="0" width="${width}" height="${height}" fill="transparent" stroke="#ccc" stroke-width="1"/>
-    <text x="${width / 2}" y="${height / 2}" text-anchor="middle" dominant-baseline="middle" font-size="14" fill="#666">Calendar</text>
+    <svg class="cal cal-grid" viewBox="0 0 ${svgWidth} ${svgHeight}" width="${width}" height="${height}" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">
+      ${headers}
+      ${cells}
+    </svg>
   </g>`;
 }
 
@@ -659,6 +787,7 @@ function renderObject(item, pageIndex, calendarSettings, allObjects = [], allPag
             break;
         case "calendar":
         case "multiplecalendar":
+        case "multiple-calendar":
             // monthPageIndex calculation for consistency
             const monthPageIndex = calendarSettings?.addCover ? Math.max(0, pageIndex - 1) : pageIndex;
             objectContent = renderCalendarObject(item, monthPageIndex, calendarSettings);
@@ -988,15 +1117,50 @@ export function generatePageSvg(options) {
         watermarkContent = `<text x="${totalCanvasWidth / 2}" y="${canvasHeight / 2}" font-size="200" font-weight="400" fill="${watermarkColor || "#000000"}" fill-opacity="0.5" text-anchor="middle" transform="rotate(-30 ${totalCanvasWidth / 2} ${canvasHeight / 2})" style="pointer-events:none; user-select:none;">${escapeXml(watermarkData)}</text>`;
     }
 
+    // Custom-product / print shape outline. Draws the product boundary (circle or
+    // rectangle) so the shape is VISIBLE in the thumbnail even when the design is
+    // empty or has a white/light background — an empty custom product is just a
+    // white shape, which is otherwise invisible on the light card. generatePageSvg
+    // is thumbnail-only (real exports clone the live canvas SVG), so this never
+    // reaches print. `vector-effect="non-scaling-stroke"` keeps it a crisp ~2px
+    // line whatever size the card renders at; a small inset keeps the full stroke
+    // inside the (circular) clip / viewBox.
+    let shapeOutlineContent = "";
+    if (
+        activeEditorType === EDITOR_TYPES.CUSTOME_PRODUCT ||
+        activeEditorType === EDITOR_TYPES.PRINT
+    ) {
+        const inset = Math.max(1, Math.min(totalCanvasWidth, canvasHeight) * 0.01);
+        shapeOutlineContent = isCircular
+            ? `<ellipse cx="${totalCanvasWidth / 2}" cy="${canvasHeight / 2}" rx="${totalCanvasWidth / 2 - inset}" ry="${canvasHeight / 2 - inset}" fill="none" stroke="#a8a8a8" stroke-width="2" vector-effect="non-scaling-stroke"/>`
+            : `<rect x="${inset}" y="${inset}" width="${totalCanvasWidth - inset * 2}" height="${canvasHeight - inset * 2}" fill="none" stroke="#a8a8a8" stroke-width="2" vector-effect="non-scaling-stroke"/>`;
+    }
+
     // Assemble full SVG
     // For single-side exports, viewBox is always [0, 0, halfWidth, height] (matching Canvas.jsx)
     const viewBoxX = 0; // Canvas.jsx never uses offset for special pages
     const viewBoxWidth = totalCanvasWidth;
-    const fullSvgContent = `<svg xmlns="http://www.w3.org/2000/svg" width="${totalCanvasWidth}" height="${canvasHeight}" viewBox="${viewBoxX} 0 ${viewBoxWidth} ${canvasHeight}" ${isCircular ? `clip-path="url(#product-shape-clip-${pageIndex})"` : ""}>
-    <defs>${defsContent}</defs>
-    ${backgroundRects.join("\n    ")}
+    // ⚠️ The product-shape clip MUST live on an inner <g>, NOT on the root <svg>.
+    // clip-path on a ROOT <svg> resolves its userSpaceOnUse coordinates against
+    // that element's OUTER (CSS) box rather than the viewBox. That happened to
+    // work while the SVG was rendered at its intrinsic size (the old
+    // <img src="data:…"> thumbnail), but the thumbnail is now inlined and scaled
+    // to the card (width/height:100%), so the ellipse — in canvas units — lands
+    // far outside the small box and clips the ENTIRE design away → blank circular
+    // custom products. On a <g> INSIDE the viewBox the coordinates resolve against
+    // the viewBox, so the clip is correct at any rendered size. Verified in
+    // Chromium: clip-on-root at 64px = fully blank; clip-on-<g> = correct circle.
+    const pageBody = `${backgroundRects.join("\n    ")}
     ${objectsContent}
-    ${safeAreaObjectsContent}
+    ${safeAreaObjectsContent}`;
+    const clippedBody = isCircular
+        ? `<g clip-path="url(#product-shape-clip-${pageIndex})">${pageBody}</g>`
+        : pageBody;
+    // The shape outline sits OUTSIDE the clip so its full stroke stays visible.
+    const fullSvgContent = `<svg xmlns="http://www.w3.org/2000/svg" width="${totalCanvasWidth}" height="${canvasHeight}" viewBox="${viewBoxX} 0 ${viewBoxWidth} ${canvasHeight}">
+    <defs>${defsContent}</defs>
+    ${clippedBody}
+    ${shapeOutlineContent}
     ${printGuidesContent}
     ${watermarkContent}
   </svg>`;
@@ -1006,11 +1170,10 @@ export function generatePageSvg(options) {
         const { left, top, width, height, id } = safeArea;
 
         // Create a cropped SVG with adjusted viewBox
-        const croppedSvg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${left} ${top} ${width} ${height}" width="${width}" height="${height}" ${isCircular ? `clip-path="url(#product-shape-clip-${pageIndex})"` : ""}>
+        // Same rule as above: clip on an inner <g>, never on the root <svg>.
+        const croppedSvg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${left} ${top} ${width} ${height}" width="${width}" height="${height}">
       <defs>${defsContent}</defs>
-      ${backgroundRects.join("\n      ")}
-      ${objectsContent}
-      ${safeAreaObjectsContent}
+      ${clippedBody}
       ${watermarkContent}
     </svg>`;
 

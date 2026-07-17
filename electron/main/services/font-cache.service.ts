@@ -37,6 +37,15 @@ export async function getCachedFont(url: string): Promise<ArrayBuffer | null> {
   }
 }
 
+/**
+ * True if this url's bytes are already cached. A pure existence probe: callers
+ * that only need "do I have this?" (e.g. a resuming theme download skipping
+ * already-warmed fonts) must not pay to read the whole file across the bridge.
+ */
+export async function hasCachedFont(url: string): Promise<boolean> {
+  return existsSync(cachePathFor(url));
+}
+
 /** Write font bytes to the cache (atomic temp+rename). No-op on failure. */
 export async function putCachedFont(url: string, bytes: ArrayBuffer): Promise<void> {
   const p = cachePathFor(url);

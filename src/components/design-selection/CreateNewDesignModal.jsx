@@ -33,6 +33,7 @@ import {
 } from "../../library/utils/helpers/customSizes";
 import {
   EDITOR_TYPES,
+  EDITOR_SUB_TYPES,
   EDITOR_ASSETS,
   USER_TYPES,
   EDITOR_ASSETS_TYPES,
@@ -81,6 +82,24 @@ import {
 import { getSizeOrientation } from "../../library/utils/helpers/orientation.js";
 import { scaleSourcePagesToTarget } from "../../library/utils/common-functions/scaleDesignPages.js";
 import BlankImagePlaceholder from "../../assets/images/blankImagePlaceholder.png";
+import DesignThumbnail from "../../common-components/DesignThumbnail";
+
+// Contextual product sub-type selectors, mirroring the web CreateThemeDialog.
+// Picking a Product Type that has sub-types (Calendar → Wall/Wooden/Mountain,
+// Acrylic, Custom Product, Greeting Card, Photobook) reveals a second dropdown
+// so the chosen `subtype` can be saved into the theme's settings. Keyed by the
+// EDITOR_TYPES value; `subKey` indexes into EDITOR_SUB_TYPES.
+const SUBTYPE_FIELDS = {
+  [EDITOR_TYPES.CALENDER]: { subKey: "CALENDER", label: "Calendar Type", placeholder: "Select Calendar Type" },
+  [EDITOR_TYPES.ACRYLIC]: { subKey: "ACRYLIC", label: "Acrylic Type", placeholder: "Select Acrylic Type" },
+  [EDITOR_TYPES.CUSTOME_PRODUCT]: { subKey: "CUSTOME_PRODUCT", label: "Product Type", placeholder: "Select Product Type" },
+  [EDITOR_TYPES.GREETING_CARD]: { subKey: "GREETING_CARD", label: "Greeting Card Type", placeholder: "Select Card Type" },
+  [EDITOR_TYPES.PHOTOBOOK]: { subKey: "PHOTOBOOK", label: "Photobook Type", placeholder: "Select Photobook Type" },
+};
+
+// snake_case value → "Title Case" label (same transform the web dialog uses).
+const prettifySubType = (v) =>
+  v.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
 
 const customToSize = (s) => ({
   key: s.id,
@@ -407,14 +426,6 @@ const ProjectCard = styled.button`
   }
 `;
 
-const ProjectThumb = styled.img`
-  width: 100%;
-  aspect-ratio: 1 / 1;
-  object-fit: contain;
-  background: ${tokens.surfaceAlt};
-  display: block;
-`;
-
 const ProjectInfo = styled.div`
   padding: 4px 6px;
   border-top: 1px solid ${tokens.line};
@@ -505,6 +516,14 @@ const CreateNewDesignModal = ({ show, onClose, user, initialCategory, mode }) =>
   const [selectedEditorType, setSelectedEditorType] = useState(
     initialCategory?.type || EDITOR_TYPES.CALENDER
   );
+  // Contextual sub-type (e.g. "wall_calendar") for product types that have one.
+  const [selectedEditorSubType, setSelectedEditorSubType] = useState("");
+  const subTypeField = SUBTYPE_FIELDS[selectedEditorType];
+  // Print & Custom Product designs carry a cut/canvas shape (rectangle | circle),
+  // mirroring the web CreateThemeDialog. Other product types have no shape field.
+  const isShapeProduct =
+    selectedEditorType === EDITOR_TYPES.PRINT ||
+    selectedEditorType === EDITOR_TYPES.CUSTOME_PRODUCT;
 
   // ── Random-layout generation (photobook / layflat only) ──────────────────────
   // When on, the new blank design is filled with a random layout on every page
@@ -546,7 +565,10 @@ const CreateNewDesignModal = ({ show, onClose, user, initialCategory, mode }) =>
   // editor type to the browsed category each time it opens — otherwise the initial
   // state goes stale across category changes.
   useEffect(() => {
-    if (show && initialCategory?.type) setSelectedEditorType(initialCategory.type);
+    if (show && initialCategory?.type) {
+      setSelectedEditorType(initialCategory.type);
+      setSelectedEditorSubType(""); // sub-type is per product type — reset on switch
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [show, initialCategory]);
 
@@ -589,6 +611,9 @@ const CreateNewDesignModal = ({ show, onClose, user, initialCategory, mode }) =>
 
   // Default to the saved unit preference, falling back to inches (NOT px).
   const [unit, setUnit] = useState(() => getPreferredUnit("in"));
+  // Cut/canvas shape for Print & Custom Product (rectangle | circle). Only used
+  // when isShapeProduct; harmless default for every other product type.
+  const [shape, setShape] = useState("rectangle");
   const [isSaving, setIsSaving] = useState(false);
 
   // Sync / initialize custom sizes
@@ -1083,6 +1108,27 @@ const CreateNewDesignModal = ({ show, onClose, user, initialCategory, mode }) =>
           }
         : {};
 
+      // Desktop's Redux store is long-lived across theme creations in one session
+      // (the web app starts from a fresh initialState on every page load). Because
+      // setSettings MERGES, spread/cover flags left over from a PRIOR photobook/
+      // layflat/foldable theme leak into a new non-spread theme — most visibly
+      // settings.isFoldable, which makes shouldShowCenterWrapperLine draw a fold
+      // line down the middle of a calendar/canvas (rendering it as a 2-up spread).
+      // Persist explicit falsy defaults so both the live editor and the saved/
+      // reloaded theme clear any stale flags. Real cover flags for photobook/
+      // layflat come from coverPayload; setSettings re-forces isFoldable:true for
+      // LAYFLATALBUM, so resetting it here is safe for spreads.
+      const finalThemeSettings = {
+        isFoldable: false,
+        coverEnabled: false,
+        showFullCoverSheet: false,
+        hideLastCover: false,
+        exportSpine: false,
+        spineWidth: 0,
+        paperThickness: 0,
+        ...coverPayload,
+      };
+
       let displayWidth = parseFloat(selectedSize.width);
       let displayHeight = parseFloat(selectedSize.height);
       let displayDpi = selectedSize.dpi || 200;
@@ -1110,6 +1156,10 @@ const CreateNewDesignModal = ({ show, onClose, user, initialCategory, mode }) =>
             height: displayHeight,
             objects: [],
             safeAreaObjects: [],
+            // Every layout side must carry a background object (canonical model);
+            // omitting it made the single-side background setters crash when a
+            // background was first applied to a freshly-created theme.
+            background: { color: null, image: null, flip: false },
           },
         ],
         settings: {
@@ -1134,11 +1184,8 @@ const CreateNewDesignModal = ({ show, onClose, user, initialCategory, mode }) =>
         // is preserved.
         dispatch(
           setSettings({
-            subtype: "",
-            isFoldable: false,
-            showFullCoverSheet: false,
-            coverEnabled: false,
-            ...coverPayload,
+            subtype: selectedEditorSubType,
+            ...finalThemeSettings,
           })
         );
         dispatch(
@@ -1180,6 +1227,10 @@ const CreateNewDesignModal = ({ show, onClose, user, initialCategory, mode }) =>
         height: displayHeight,
         size: `${displayWidth}x${displayHeight}`,
         depth: 0,
+        // Print / Custom Product shape. Stored at top level AND in settings so the
+        // t_id reload (useThemeSetup reads `theme.settings?.shape || theme.shape`)
+        // restores it either way.
+        ...(isShapeProduct ? { shape } : {}),
         safe_margin: displaySafeMargin,
         bleed_margin: displayBleedMargin,
         dpi: displayDpi,
@@ -1188,8 +1239,9 @@ const CreateNewDesignModal = ({ show, onClose, user, initialCategory, mode }) =>
         number_of_layouts: 1,
         cal_settings: null,
         settings: {
-          subtype: "",
-          ...coverPayload,
+          subtype: selectedEditorSubType,
+          ...finalThemeSettings,
+          ...(isShapeProduct ? { shape } : {}),
         },
       };
 
@@ -1221,13 +1273,16 @@ const CreateNewDesignModal = ({ show, onClose, user, initialCategory, mode }) =>
             safeMargin: displaySafeMargin,
             bleedMargin: displayBleedMargin,
             dpi: displayDpi,
+            ...(isShapeProduct ? { shape } : {}),
           })
         );
-        // Apply cover/spine flags to the live editor after pages + size are set,
-        // so the reducer reconstructs the cover structure against the final pages.
-        if (supportsCoverSettings(selectedEditorType)) {
-          dispatch(setSettings(coverPayload));
-        }
+        // Apply settings to the live editor after pages + size are set, so the
+        // reducer reconstructs the cover structure against the final pages. Always
+        // dispatch (not just for cover-capable types): non-spread products must
+        // reset any stale settings.isFoldable / cover flags left in the long-lived
+        // store, otherwise the new design (and its restore snapshot) renders as a
+        // fold spread. finalThemeSettings ⊇ coverPayload, so spreads are unchanged.
+        dispatch(setSettings({ subtype: selectedEditorSubType, ...finalThemeSettings, ...(isShapeProduct ? { shape } : {}) }));
         // A design is applied — mark it so the Footer thumbnails (and canvas)
         // leave the skeleton state immediately (before the restore effect settles).
         dispatch(setThemeApplied(true));
@@ -1256,6 +1311,7 @@ const CreateNewDesignModal = ({ show, onClose, user, initialCategory, mode }) =>
             safeMargin: displaySafeMargin,
             bleedMargin: displayBleedMargin,
             dpi: displayDpi,
+            ...(isShapeProduct ? { shape } : {}),
           },
           editorType: selectedEditorType,
           orientation: orientationOf(displayWidth, displayHeight).charAt(0),
@@ -1266,7 +1322,7 @@ const CreateNewDesignModal = ({ show, onClose, user, initialCategory, mode }) =>
           // cover toggle the user picked. Mirrors the admin themePayload
           // (`{ subtype:"", ...coverPayload }`), which is why cover worked for
           // admins but not customers.
-          settings: { subtype: "", ...coverPayload },
+          settings: { subtype: selectedEditorSubType, ...finalThemeSettings, ...(isShapeProduct ? { shape } : {}) },
           calendarSettings: null,
           minPages: 1,
           maxPages: 100,
@@ -1430,10 +1486,12 @@ const CreateNewDesignModal = ({ show, onClose, user, initialCategory, mode }) =>
                         onClick={() => handleSelectProject(proj)}
                         title={proj.name || "Untitled design"}
                       >
-                        <ProjectThumb
-                          src={proj.thumbnail || BlankImagePlaceholder}
+                        <DesignThumbnail
+                          thumbnail={proj.thumbnail}
+                          scopeId={proj.id}
                           alt={proj.name || "project"}
-                          loading="lazy"
+                          fallbackSrc={BlankImagePlaceholder}
+                          style={{ aspectRatio: "1 / 1", background: tokens.surfaceAlt }}
                         />
                         <ProjectInfo>
                           <ProjectName>{proj.name || "Untitled design"}</ProjectName>
@@ -1480,7 +1538,10 @@ const CreateNewDesignModal = ({ show, onClose, user, initialCategory, mode }) =>
             <Select
               id="editor-type-select"
               value={selectedEditorType}
-              onChange={(e) => setSelectedEditorType(e.target.value)}
+              onChange={(e) => {
+                setSelectedEditorType(e.target.value);
+                setSelectedEditorSubType(""); // reset sub-type when type changes
+              }}
             >
               {Object.keys(EDITOR_TYPES).map((key) => (
                 <option key={key} value={EDITOR_TYPES[key]}>
@@ -1491,6 +1552,31 @@ const CreateNewDesignModal = ({ show, onClose, user, initialCategory, mode }) =>
               ))}
             </Select>
           </FormSection>
+
+          {/* Contextual sub-type selector (Calendar → Wall/Wooden/Mountain,
+              Acrylic, Custom Product, Greeting Card, Photobook) — mirrors the web
+              CreateThemeDialog so these sub-types are reachable when creating a
+              new theme. */}
+          {subTypeField && (
+            <FormSection>
+              <Label htmlFor="editor-subtype-select">{subTypeField.label}</Label>
+              <Select
+                id="editor-subtype-select"
+                value={selectedEditorSubType}
+                onChange={(e) => setSelectedEditorSubType(e.target.value)}
+              >
+                <option value="">{subTypeField.placeholder}</option>
+                {Object.keys(EDITOR_SUB_TYPES[subTypeField.subKey]).map((key) => {
+                  const value = EDITOR_SUB_TYPES[subTypeField.subKey][key];
+                  return (
+                    <option key={key} value={value}>
+                      {prettifySubType(value)}
+                    </option>
+                  );
+                })}
+              </Select>
+            </FormSection>
+          )}
 
           {isSpreadCategory && (
             <FormSection>
@@ -1684,6 +1770,19 @@ const CreateNewDesignModal = ({ show, onClose, user, initialCategory, mode }) =>
                 />
               </Field>
             </FieldGrid>
+            {/* Shape — Print / Custom Product only (matches the web Step Design
+                module). Rectangle vs circular cut/canvas. */}
+            {isShapeProduct && (
+              <FieldGrid style={{ marginTop: 10 }}>
+                <Field>
+                  Shape
+                  <select value={shape} onChange={(e) => setShape(e.target.value)}>
+                    <option value="rectangle">Rectangle</option>
+                    <option value="circle">Circle</option>
+                  </select>
+                </Field>
+              </FieldGrid>
+            )}
             {selectedSize && (
               <p style={{ margin: "6px 0 0", fontSize: "12px", color: tokens.muted }}>
                 {Math.round(selectedSize.width)}×{Math.round(selectedSize.height)} px · {orientationOf(selectedSize.width, selectedSize.height)}

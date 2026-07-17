@@ -79,6 +79,7 @@ const api: DesktopApi = {
     cacheGet: (url: string) => invoke<ArrayBuffer | null>(CHANNELS.fontsCacheGet, url),
     cachePut: (url: string, bytes: ArrayBuffer) =>
       invoke<void>(CHANNELS.fontsCachePut, url, bytes),
+    cacheHas: (url: string) => invoke<boolean>(CHANNELS.fontsCacheHas, url),
   },
   assetsCache: {
     get: (category: string, key: string) =>
@@ -131,7 +132,8 @@ const api: DesktopApi = {
     return () => ipcRenderer.removeListener(CHANNELS.menuEvent, listener);
   },
   onUpdateStatus: (cb: (status: UpdateStatus, progress?: number) => void) => {
-    const listener = (_: unknown, status: UpdateStatus, progress?: number) => cb(status, progress);
+    const listener = (_: unknown, status: UpdateStatus, progress?: number) =>
+      cb(status, progress);
     ipcRenderer.on(CHANNELS.updateStatus, listener);
     return () => ipcRenderer.removeListener(CHANNELS.updateStatus, listener);
   },

@@ -4,10 +4,14 @@
  * DesignSelectionPage; renders nothing when that's null.
  *
  *   download = {
- *     name, total, done, failed, bytes,
+ *     name, total, done, failed, missing, bytes,
  *     status: "downloading" | "done" | "error",
  *     error?: string,
  *   }
+ *
+ * `failed` means assets that couldn't be fetched (almost always a dropped
+ * connection) — those are resumable. `missing` means the server no longer has
+ * them, which nothing can fix; they're reported but don't hold the theme back.
  */
 import React from "react";
 import styled, { keyframes } from "styled-components";
@@ -118,17 +122,46 @@ const fmtBytes = (n) => {
 
 const ThemeDownloadToast = ({ download, onClose }) => {
   if (!download) return null;
-  const { name, total = 0, done = 0, failed = 0, bytes = 0, status, error } = download;
-  const tone = status === "error" ? "error" : status === "done" ? "done" : "downloading";
-  const pct = total > 0 ? Math.min(100, Math.round((done / total) * 100)) : status === "done" ? 100 : 8;
+  const {
+    name,
+    total = 0,
+    done = 0,
+    failed = 0,
+    missing = 0,
+    bytes = 0,
+    status,
+    error,
+  } = download;
+  // `done` counts every SETTLED asset, failures included — so on a dropped
+  // connection it races to `total` and would show a full bar under an
+  // "interrupted" label. Progress means assets we actually HAVE. Permanently
+  // unavailable ones still count: they're excluded from the completeness test
+  // too, so the bar agrees with whether the theme can finish.
+  const ok = Math.max(0, done - failed);
+  const isPartial = status === "done" && failed > 0;
+  const tone = status === "error" || isPartial ? "error" : status === "done" ? "done" : "downloading";
+  // Floor + cap at 99 until every asset is actually in: rounding would let
+  // 199/200 paint a FULL bar under an "interrupted" label. A full bar must mean
+  // finished, nothing else.
+  const pct =
+    total > 0
+      ? ok >= total
+        ? 100
+        : Math.min(99, Math.floor((ok / total) * 100))
+      : status === "done"
+      ? 100
+      : 8;
 
+  // A partial finish is NOT a success with an asterisk — it's an interrupted
+  // download the user can pick back up, and saying so is the difference between
+  // them clicking Resume and them deleting the pack to start over.
   const label =
     status === "error"
       ? "Download failed"
+      : isPartial
+      ? "Download interrupted — Resume when you're back online"
       : status === "done"
-      ? failed > 0
-        ? "Downloaded (some assets skipped)"
-        : "Successfully downloaded"
+      ? "Successfully downloaded"
       : "Downloading theme…";
 
   return (
@@ -164,7 +197,9 @@ const ThemeDownloadToast = ({ download, onClose }) => {
         ) : (
           <>
             <span>
-              {done}/{total} assets{failed > 0 ? ` · ${failed} skipped` : ""}
+              {ok}/{total} assets
+              {failed > 0 ? ` · ${failed} left to retry` : ""}
+              {missing > 0 ? ` · ${missing} unavailable` : ""}
             </span>
             <span>{fmtBytes(bytes)}</span>
           </>

@@ -24,7 +24,7 @@
 import { app } from "electron";
 import { existsSync } from "fs";
 import { randomBytes } from "crypto";
-import { mkdir, writeFile, readFile, rename, rm } from "fs/promises";
+import { mkdir, writeFile, readFile, rename, rm, stat } from "fs/promises";
 import { join, normalize, sep } from "path";
 import type {
   ThemePackAsset,
@@ -151,6 +151,42 @@ function withIndexLock<T>(fn: () => Promise<T>): Promise<T> {
   return run;
 }
 
+// Same idea, per theme: saveManifest is now a read-modify-write (it unions the
+// incoming assets into the prior manifest), so two overlapping saves for the
+// SAME pack would otherwise both read the same prior state and the last writer
+// would drop the other's assets. A download checkpoints periodically, so
+// overlapping saves are a routine occurrence, not a corner case.
+// A download checkpoints many times and re-sends the SAME theme.json each time.
+// Re-validating (a synchronous multi-MB JSON.parse blocks the main process and
+// janks every window) and rewriting byte-identical content is pure waste, so
+// remember what we last wrote per pack and skip both when it hasn't changed.
+// A cheap FNV-1a over the string — never a security boundary, just change
+// detection; the content is still fully parsed the first time it is seen.
+const lastThemeJsonHash = new Map<string, string>();
+
+function cheapHash(s: string): string {
+  let h = 0x811c9dc5;
+  for (let i = 0; i < s.length; i++) {
+    h ^= s.charCodeAt(i);
+    h = (h + ((h << 1) + (h << 4) + (h << 7) + (h << 8) + (h << 24))) >>> 0;
+  }
+  return `${s.length}:${h.toString(36)}`;
+}
+
+const packChains = new Map<string, Promise<unknown>>();
+function withPackLock<T>(themeId: string, fn: () => Promise<T>): Promise<T> {
+  const key = safeId(themeId);
+  const prev = packChains.get(key) ?? Promise.resolve();
+  const run = prev.then(fn, fn);
+  // Keep the map from growing forever: drop the entry once this is the tail.
+  const settled = run.catch(() => undefined);
+  packChains.set(key, settled);
+  settled.then(() => {
+    if (packChains.get(key) === settled) packChains.delete(key);
+  });
+  return run;
+}
+
 // ── Public API (called by theme-packs.ipc) ─────────────────────────
 
 /** Lightweight pack list for the offline grid, newest download first. */
@@ -198,80 +234,162 @@ export async function themePacksPutAsset(
   await rename(tmp, dest);
 }
 
-/** Persist theme.json + manifest.json and upsert the index entry. */
+/**
+ * Persist theme.json + manifest.json and upsert the index entry — ADDITIVELY.
+ *
+ * This is a CHECKPOINT, not a "download finished" call. The renderer saves after
+ * every batch of assets and on abort, so `input.assets` is only what THAT run
+ * saw. A plain overwrite would therefore truncate an interrupted download's
+ * record on every resume — the pack's earlier bytes would still be on disk but
+ * would vanish from the url map, i.e. be unreachable and effectively lost.
+ *
+ * So we union with the prior manifest, under a per-pack lock (checkpoints
+ * overlap by design). The union also protects a pack shared by two accounts:
+ * getThemeById is size-filtered per user type, so a CUSTOMER's run legitimately
+ * enumerates fewer assets than an admin's and must not erase the difference.
+ *
+ * `totalBytes` is computed from the files actually on disk rather than trusted
+ * from the renderer: a resumed run only transfers the delta, so a renderer total
+ * would make the pack appear to shrink on every resume.
+ */
 export async function themePacksSaveManifest(input: SaveThemePackInput): Promise<void> {
   if (!input || typeof input.themeId !== "string") throw new Error("themeId required");
-  JSON.parse(input.themeJson); // validate before writing
 
   const { themeId } = input;
-  await writeText(themeJsonPath(themeId), input.themeJson);
+  const themeJsonHash = cheapHash(input.themeJson);
+  // Unchanged since our last write for this pack → already validated, already on
+  // disk. Skip the parse and the rewrite (see lastThemeJsonHash).
+  const themeJsonChanged = lastThemeJsonHash.get(safeId(themeId)) !== themeJsonHash;
+  if (themeJsonChanged) JSON.parse(input.themeJson); // validate before writing
 
-  const assets: ThemePackAsset[] = Array.isArray(input.assets)
-    ? input.assets.filter(
-        (a) => a && typeof a.url === "string" && isSafeAssetFile(a.file)
-      )
+  const incoming: ThemePackAsset[] = Array.isArray(input.assets)
+    ? input.assets.filter((a) => a && typeof a.url === "string" && isSafeAssetFile(a.file))
     : [];
 
-  // Resolve the thumbnail's local url (its original url lives in assets[]).
-  const thumbAsset = input.thumbnailUrl
-    ? assets.find((a) => a.url === input.thumbnailUrl)
-    : undefined;
-  const thumbnail = thumbAsset ? localAssetUrl(themeId, thumbAsset.file) : null;
-
-  const manifest: ThemePackManifest = {
-    themeId,
-    name: input.name || "Untitled theme",
-    category: input.category ?? null,
-    version: input.version ?? null,
-    fingerprint: input.fingerprint ?? null,
-    thumbnail,
-    sizesCount: Array.isArray(input.sizes) ? input.sizes.length : 0,
-    downloadedAt: input.downloadedAt || Date.now(),
-    totalBytes: input.totalBytes || 0,
-    complete: input.complete !== false,
-    sizes: Array.isArray(input.sizes) ? input.sizes : [],
-    assets,
-    fontUrls: Array.isArray(input.fontUrls) ? input.fontUrls : [],
-    thumbnailUrl: input.thumbnailUrl ?? null,
-  };
-  await writeJson(manifestPath(themeId), manifest);
-
-  const meta: ThemePackMeta = {
-    themeId: manifest.themeId,
-    name: manifest.name,
-    category: manifest.category,
-    version: manifest.version,
-    fingerprint: manifest.fingerprint,
-    thumbnail: manifest.thumbnail,
-    sizesCount: manifest.sizesCount,
-    downloadedAt: manifest.downloadedAt,
-    totalBytes: manifest.totalBytes,
-    complete: manifest.complete,
-  };
-  await withIndexLock(async () => {
-    const arr = await readJson<ThemePackMeta[]>(indexPath(), []);
-    const rest = arr.filter((m) => m && m.themeId !== themeId);
-    await writeJson(indexPath(), [meta, ...rest]);
-  });
-}
-
-/** Remove a pack (directory + index entry). */
-export async function themePacksDelete(themeId: string): Promise<void> {
-  const dir = packDir(themeId);
-  if (isInsidePacksRoot(dir) && dir !== normalize(packsRoot())) {
-    try {
-      await rm(dir, { recursive: true, force: true });
-    } catch {
-      /* best-effort */
+  // The lock is joined SYNCHRONOUSLY (nothing is awaited above it), so lock
+  // order matches IPC arrival order. Awaiting anything first — theme.json used
+  // to be written here — would let two saves for the same pack take the lock in
+  // the order their filesystem writes happened to finish, and a checkpoint that
+  // landed after the final save would stamp `complete: false` back over a pack
+  // that had actually finished, stranding it behind Resume forever.
+  // Writing theme.json inside also keeps a pack's two files consistent.
+  await withPackLock(themeId, async () => {
+    // Re-check inside the lock: a delete may have removed the file since, in
+    // which case the memo is stale and it must be written again.
+    if (themeJsonChanged || !existsSync(themeJsonPath(themeId))) {
+      await writeText(themeJsonPath(themeId), input.themeJson);
+      lastThemeJsonHash.set(safeId(themeId), themeJsonHash);
     }
-  }
-  await withIndexLock(async () => {
-    const arr = await readJson<ThemePackMeta[]>(indexPath(), []);
-    await writeJson(indexPath(), arr.filter((m) => m && m.themeId !== themeId));
+    const prior = await readJson<ThemePackManifest | null>(manifestPath(themeId), null);
+
+    // Union prior + incoming by url; incoming wins on collision. Prior entries
+    // are re-validated rather than trusted — never echo back a name that
+    // wouldn't pass today's rules just because an older build wrote it.
+    const byUrl = new Map<string, ThemePackAsset>();
+    for (const a of prior?.assets ?? []) {
+      if (a && typeof a.url === "string" && isSafeAssetFile(a.file)) byUrl.set(a.url, a);
+    }
+    for (const a of incoming) byUrl.set(a.url, a);
+
+    // Drop any entry whose bytes are gone (stale wipe, manual delete, failed
+    // write) and total up what genuinely survives — one stat pass, both jobs.
+    // A phantom entry would put a dead app-assets:// url into the url map.
+    const assets: ThemePackAsset[] = [];
+    let totalBytes = 0;
+    for (const a of byUrl.values()) {
+      try {
+        const s = await stat(join(assetsDir(themeId), a.file));
+        totalBytes += s.size;
+        assets.push(a);
+      } catch {
+        /* file no longer on disk — reap the manifest entry */
+      }
+    }
+
+    const present = new Set(assets.map((a) => a.url));
+    // An url that has since downloaded successfully is no longer missing.
+    const missing = [
+      ...new Set([
+        ...(Array.isArray(prior?.missing) ? prior!.missing : []),
+        ...(Array.isArray(input.missing) ? input.missing.filter((u) => typeof u === "string") : []),
+      ]),
+    ].filter((u) => !present.has(u));
+
+    // Resolve the thumbnail's local url (its original url lives in assets[]).
+    const thumbAsset = input.thumbnailUrl
+      ? assets.find((a) => a.url === input.thumbnailUrl)
+      : undefined;
+    const thumbnail = thumbAsset ? localAssetUrl(themeId, thumbAsset.file) : null;
+
+    const manifest: ThemePackManifest = {
+      themeId,
+      name: input.name || "Untitled theme",
+      category: input.category ?? null,
+      version: input.version ?? null,
+      fingerprint: input.fingerprint ?? null,
+      thumbnail,
+      sizesCount: Array.isArray(input.sizes) ? input.sizes.length : 0,
+      downloadedAt: input.downloadedAt || Date.now(),
+      totalBytes,
+      complete: input.complete === true,
+      missingCount: missing.length,
+      sizes: Array.isArray(input.sizes) ? input.sizes : [],
+      assets,
+      fontUrls: Array.isArray(input.fontUrls) ? input.fontUrls : [],
+      thumbnailUrl: input.thumbnailUrl ?? null,
+      missing,
+    };
+    await writeJson(manifestPath(themeId), manifest);
+
+    const meta: ThemePackMeta = {
+      themeId: manifest.themeId,
+      name: manifest.name,
+      category: manifest.category,
+      version: manifest.version,
+      fingerprint: manifest.fingerprint,
+      thumbnail: manifest.thumbnail,
+      sizesCount: manifest.sizesCount,
+      downloadedAt: manifest.downloadedAt,
+      totalBytes: manifest.totalBytes,
+      complete: manifest.complete,
+      missingCount: manifest.missingCount,
+    };
+    await withIndexLock(async () => {
+      const arr = await readJson<ThemePackMeta[]>(indexPath(), []);
+      const rest = arr.filter((m) => m && m.themeId !== themeId);
+      await writeJson(indexPath(), [meta, ...rest]);
+    });
   });
 }
 
-/** originalUrl → app-assets:// url for every asset of every COMPLETE pack. */
+/**
+ * Remove a pack (directory + index entry).
+ *
+ * Takes the SAME per-pack lock as saveManifest: a delete that interleaved with a
+ * download's checkpoint would rm -rf the directory and then have the checkpoint
+ * write manifest.json + an index entry straight back, resurrecting the pack the
+ * user just removed. (The renderer additionally refuses to delete a pack whose
+ * download is still running — this lock is the main-side backstop.)
+ */
+export async function themePacksDelete(themeId: string): Promise<void> {
+  await withPackLock(themeId, async () => {
+    lastThemeJsonHash.delete(safeId(themeId)); // the file is about to go — forget it
+    const dir = packDir(themeId);
+    if (isInsidePacksRoot(dir) && dir !== normalize(packsRoot())) {
+      try {
+        await rm(dir, { recursive: true, force: true });
+      } catch {
+        /* best-effort */
+      }
+    }
+    await withIndexLock(async () => {
+      const arr = await readJson<ThemePackMeta[]>(indexPath(), []);
+      await writeJson(indexPath(), arr.filter((m) => m && m.themeId !== themeId));
+    });
+  });
+}
+
+/** originalUrl → app-assets:// url for every asset of every pack, partial included. */
 export async function themePacksUrlMap(): Promise<Record<string, string>> {
   const metas = await themePacksList();
   const map: Record<string, string> = {};

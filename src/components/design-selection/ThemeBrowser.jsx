@@ -83,6 +83,9 @@ const ThemeBrowser = ({
   // `downloadSupported` is false the controls aren't rendered at all.
   downloadSupported = false,
   downloadedIds = null,
+  // Ids whose pack is on disk but INCOMPLETE (interrupted download). Subset of
+  // downloadedIds — those cards offer Resume instead of claiming "Installed".
+  partialIds = null,
   downloadingId = null,
   onDownloadTheme,
   // "Blank" card (photobook / layflat only) — a leading grid tile that starts a
@@ -236,6 +239,7 @@ const ThemeBrowser = ({
               theme?.theme_images?.length > 0 ? theme.theme_images[0]?.url : "";
             const isLoading = selectedThemeId === theme._id;
             const isDownloaded = !!downloadedIds && downloadedIds.has(theme._id);
+            const isPartial = !!partialIds && partialIds.has(theme._id);
             const isDownloading = downloadingId === theme._id;
             return (
               <ThemeCardWrap key={theme._id}>
@@ -254,12 +258,16 @@ const ThemeBrowser = ({
                   <ThemeName>{theme.name || "Untitled design"}</ThemeName>
                 </ThemeCard>
 
-                {/* Offline action (desktop only). "Installed" once downloaded —
-                    disabled; removing the pack from the sidebar's Offline tab
-                    updates downloadedIds and flips this back to "Download". */}
+                {/* Offline action (desktop only). "Installed" only when the pack
+                    is COMPLETE — an interrupted download stays actionable as
+                    "Resume" rather than claiming to be available offline.
+                    Resume deliberately reuses the Download button: it inherits
+                    the `!!downloadingId` guard that keeps downloads single-file.
+                    Removing the pack from the sidebar's Offline tab updates
+                    downloadedIds and flips this back to "Download". */}
                 {downloadSupported && (
                   <ThemeCardFooter>
-                    {isDownloaded ? (
+                    {isDownloaded && !isPartial ? (
                       <ThemeInstalledButton
                         type="button"
                         disabled
@@ -275,8 +283,16 @@ const ThemeBrowser = ({
                           e.stopPropagation();
                           onDownloadTheme?.(theme);
                         }}
-                        aria-label={`Download ${theme.name || "design"} for offline use`}
-                        title={isDownloading ? "Downloading…" : "Download for offline use"}
+                        aria-label={`${
+                          isPartial ? "Resume downloading" : "Download"
+                        } ${theme.name || "design"} for offline use`}
+                        title={
+                          isDownloading
+                            ? "Downloading…"
+                            : isPartial
+                            ? "Partly downloaded — pick up where it stopped"
+                            : "Download for offline use"
+                        }
                       >
                         {isDownloading ? (
                           <>
@@ -284,7 +300,7 @@ const ThemeBrowser = ({
                           </>
                         ) : (
                           <>
-                            <FaDownload size={11} /> Download
+                            <FaDownload size={11} /> {isPartial ? "Resume" : "Download"}
                           </>
                         )}
                       </ThemeDownloadButton>

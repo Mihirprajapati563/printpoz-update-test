@@ -12,6 +12,7 @@ import {
   FaSearch,
   FaTimes,
   FaSignOutAlt,
+  FaArrowLeft,
 } from "react-icons/fa";
 import { setUserDetails, resetThemeDetails, resetProject } from "../../store/slices/projectSetup";
 import { setEditorType, resetEditor } from "../../store/slices/canvas";
@@ -24,8 +25,8 @@ import {
 import {
   listThemePacks,
   deleteThemePack,
-  addThemePackOwner,
 } from "../../library/utils/helpers/themePacks";
+import { isOnline } from "../../library/utils/helpers/assetsCache";
 import {
   getSessionToken,
   getUrlParam,
@@ -42,8 +43,10 @@ import {
   removeSavedDesign,
   stageDesignForRestore,
 } from "../../library/utils/helpers/savedDesigns";
+import { regenerateStaleThumbnails } from "../../library/utils/helpers/regenerateThumbnails";
 import { EDITOR_CATEGORIES, EDITOR_TYPES, USER_TYPES } from "../../library/utils/constants";
 import { LoadingState, ErrorState, Spinner } from "../../common-components/StateViews";
+import DesignThumbnail from "../../common-components/DesignThumbnail";
 import {
   CategoryGrid,
   ThemeBrowser,
@@ -164,11 +167,17 @@ const DesignSelectionPage = () => {
   const downloadSupported = useMemo(() => isThemeDownloadSupported(), []);
   const [themePacks, setThemePacks] = useState([]); // downloaded packs (sidebar)
   const [downloadedIds, setDownloadedIds] = useState(() => new Set());
+  // Subset of downloadedIds whose download was interrupted — offered as "Resume".
+  const [partialIds, setPartialIds] = useState(() => new Set());
   const [downloadingId, setDownloadingId] = useState(null);
   const [downloadState, setDownloadState] = useState(null); // toast model | null
   const [packConfirmId, setPackConfirmId] = useState(null); // delete confirm
   const downloadAbortRef = useRef(null);
   const toastHideRef = useRef(null);
+  // The theme whose download was interrupted in THIS session, so reconnecting
+  // can pick it back up. Scoped to the session on purpose: auto-starting every
+  // partial pack on disk would mean surprise traffic on a metered connection.
+  const resumeTargetRef = useRef(null);
 
   const token = useMemo(() => getSessionToken(location.search), [location.search]);
 
@@ -320,6 +329,22 @@ const DesignSelectionPage = () => {
     refreshDesigns();
   };
 
+  // One-time (per account) background pass to refresh thumbnails saved by an
+  // older generator — e.g. calendars that used to render as a placeholder now
+  // render a real grid. Runs after the initial list is shown so cards appear
+  // immediately, preserves each card's name/date/order, and re-lists only if
+  // something changed. Guarded so it never runs twice in a session.
+  const regenStartedRef = useRef(false);
+  useEffect(() => {
+    if (regenStartedRef.current) return;
+    if (!user?._id || designsLoading) return; // wait for the account + first load
+    regenStartedRef.current = true;
+    (async () => {
+      const updated = await regenerateStaleThumbnails({ accountId: user._id });
+      if (updated > 0 && aliveRef.current) refreshDesigns();
+    })();
+  }, [user?._id, designsLoading, refreshDesigns]);
+
   // ── Downloaded theme packs (offline library) ────────────────────────────────
   const refreshDownloaded = useCallback(async () => {
     if (!downloadSupported) return;
@@ -328,6 +353,12 @@ const DesignSelectionPage = () => {
       if (!aliveRef.current) return;
       setThemePacks(list);
       setDownloadedIds(new Set(list.map((p) => p.themeId)));
+      // `=== false`, never `!p.complete`: packs downloaded before this flag
+      // existed have `complete: undefined`, and treating those as partial would
+      // put every already-installed theme behind a Resume button on upgrade.
+      setPartialIds(
+        new Set(list.filter((p) => p.complete === false).map((p) => p.themeId)),
+      );
     } catch (_) {
       /* leave the previous list in place on a transient read error */
     }
@@ -376,30 +407,39 @@ const DesignSelectionPage = () => {
             if (aliveRef.current) setDownloadState({ ...p, status: "downloading" });
           },
         });
+        // Ownership is claimed inside the orchestrator now — it also has to
+        // happen on the abort path, which runs after this page is gone.
+        // Remember an unfinished pack so reconnecting can pick it back up;
+        // clear it once the theme is fully in.
+        resumeTargetRef.current = result.complete ? null : theme;
         if (!aliveRef.current) return;
-        // Record that THIS account downloaded the pack so it shows only in this
-        // account's "Downloaded Themes" list (the bytes on disk are shared).
-        addThemePackOwner(theme._id);
         setDownloadState({
           name: theme.name,
           total: result.total,
           done: result.done,
           failed: result.failed,
+          missing: result.missing,
           bytes: result.bytes,
           status: "done",
         });
         await refreshDownloaded();
-        scheduleToastHide();
+        // Leave an incomplete result up longer — it carries an action.
+        scheduleToastHide(result.complete ? 4500 : 8000);
       } catch (err) {
+        // Interrupted, not lost: the orchestrator has checkpointed whatever it
+        // downloaded, so this theme can resume later.
+        resumeTargetRef.current = theme;
         if (!aliveRef.current) return;
         if (err?.name === "AbortError") {
           setDownloadState(null);
+          refreshDownloaded(); // surface the freshly-checkpointed partial
         } else {
           setDownloadState((s) => ({
             ...(s || { name: theme.name }),
             status: "error",
             error: String(err?.message || err),
           }));
+          refreshDownloaded();
           scheduleToastHide(8000);
         }
       } finally {
@@ -409,6 +449,21 @@ const DesignSelectionPage = () => {
     },
     [downloadSupported, downloadingId, refreshDownloaded, scheduleToastHide],
   );
+
+  // Pick the interrupted download back up when the network returns. Only the
+  // pack interrupted in THIS session, and only when nothing else is downloading.
+  // A spurious `online` event is harmless — nothing here deletes bytes, so the
+  // worst case is a run that fails immediately and re-checkpoints the same pack.
+  useEffect(() => {
+    if (!downloadSupported) return undefined;
+    const onOnline = () => {
+      const target = resumeTargetRef.current;
+      if (!target || downloadingId || !isOnline()) return;
+      handleDownloadTheme(target);
+    };
+    window.addEventListener("online", onOnline);
+    return () => window.removeEventListener("online", onOnline);
+  }, [downloadSupported, downloadingId, handleDownloadTheme]);
 
   // Open a downloaded pack: shape it like a theme card and reuse the size modal.
   // Offline, GetThemeById serves the pack's theme.json so the variants resolve.
@@ -423,7 +478,19 @@ const DesignSelectionPage = () => {
   };
 
   const handleDeleteThemePack = async (themeId) => {
+    // Never delete a pack whose download is still running. The orchestrator
+    // would just recreate the directory it's mid-way through writing and its
+    // next checkpoint would resurrect the pack — the user's delete silently
+    // undone, and the bytes re-transferred. The trash button is hidden in that
+    // state; this is the backstop for a confirm dialog that was already open
+    // when an auto-resume kicked off underneath it. Leave the dialog up rather
+    // than closing it, so a confirmed delete never just evaporates.
+    if (downloadingId === themeId) return;
     setPackConfirmId(null);
+    // A deleted pack must stop being the reconnect target, or the `online`
+    // listener would re-download the very theme the user just removed — from
+    // zero, since its bytes are gone.
+    if (resumeTargetRef.current?._id === themeId) resumeTargetRef.current = null;
     await deleteThemePack(themeId);
     refreshDownloaded();
   };
@@ -637,13 +704,16 @@ const DesignSelectionPage = () => {
               }}
             >
               <SavedThumb>
-                {d.thumbnail ? (
-                  <img src={d.thumbnail} alt={d.name} loading="lazy" />
-                ) : (
-                  <span className="placeholder">
-                    <FaRegImage />
-                  </span>
-                )}
+                <DesignThumbnail
+                  thumbnail={d.thumbnail}
+                  scopeId={d.id}
+                  alt={d.name}
+                  fallback={
+                    <span className="placeholder">
+                      <FaRegImage />
+                    </span>
+                  }
+                />
               </SavedThumb>
               <SavedInfo>
                 <div className="name">{d.name}</div>
@@ -680,6 +750,10 @@ const DesignSelectionPage = () => {
                       e.stopPropagation();
                       setConfirmId(d.id);
                     }}
+                    // Without this the row's Enter/Space handler swallows the key
+                    // and opens the design instead, so the delete confirm is
+                    // unreachable by keyboard.
+                    onKeyDown={(e) => e.stopPropagation()}
                     aria-label={`Delete ${d.name}`}
                     title="Delete design"
                   >
@@ -745,28 +819,76 @@ const DesignSelectionPage = () => {
                 <span>
                   {p.sizesCount} size{p.sizesCount === 1 ? "" : "s"}
                 </span>
+                {/* `=== false` — legacy packs predate the flag (see refreshDownloaded). */}
+                {p.complete === false && <span className="type">Partial</span>}
+                {p.complete !== false && p.missingCount > 0 && (
+                  <span title="Some assets are no longer available from the server">
+                    {p.missingCount} unavailable
+                  </span>
+                )}
               </div>
-              {packConfirmId === p.themeId && (
-                <SavedConfirm onClick={(e) => e.stopPropagation()}>
-                  <span>Remove download?</span>
+              {/* The row itself is a role="button" that opens the pack on
+                  Enter/Space, so anything interactive inside it must stop BOTH
+                  click and keydown — otherwise the row swallows the key and
+                  opens the theme instead of pressing the button under focus. */}
+              {p.complete === false && packConfirmId !== p.themeId && (
+                <SavedConfirm
+                  onClick={(e) => e.stopPropagation()}
+                  onKeyDown={(e) => e.stopPropagation()}
+                >
+                  <span>Download stopped early</span>
                   <button
                     className="yes"
+                    disabled={!!downloadingId}
+                    onClick={() =>
+                      handleDownloadTheme({
+                        _id: p.themeId,
+                        name: p.name,
+                        editor_type: p.category,
+                      })
+                    }
+                  >
+                    {downloadingId === p.themeId ? "Resuming…" : "Resume"}
+                  </button>
+                </SavedConfirm>
+              )}
+              {packConfirmId === p.themeId && (
+                <SavedConfirm
+                  onClick={(e) => e.stopPropagation()}
+                  onKeyDown={(e) => e.stopPropagation()}
+                >
+                  {/* An auto-resume can start while this dialog is open, and we
+                      refuse to delete a pack mid-download — say so rather than
+                      leaving a Yes button that does nothing. */}
+                  <span>
+                    {downloadingId === p.themeId
+                      ? "Downloading — can't remove yet"
+                      : "Remove download?"}
+                  </span>
+                  <button
+                    className="yes"
+                    disabled={downloadingId === p.themeId}
                     onClick={() => handleDeleteThemePack(p.themeId)}
                   >
                     Yes
                   </button>
                   <button className="no" onClick={() => setPackConfirmId(null)}>
-                    No
+                    {downloadingId === p.themeId ? "Close" : "No"}
                   </button>
                 </SavedConfirm>
               )}
             </SavedInfo>
-            {packConfirmId !== p.themeId && (
+            {/* No delete affordance while THIS pack is downloading: removing the
+                directory out from under the running orchestrator would only get
+                it recreated, and re-transfer everything that was already on
+                disk. Other packs stay deletable. */}
+            {packConfirmId !== p.themeId && downloadingId !== p.themeId && (
               <SavedDeleteBtn
                 onClick={(e) => {
                   e.stopPropagation();
                   setPackConfirmId(p.themeId);
                 }}
+                onKeyDown={(e) => e.stopPropagation()}
                 aria-label={`Remove ${p.name} download`}
                 title="Remove download"
               >
@@ -875,13 +997,10 @@ const DesignSelectionPage = () => {
             <>
               <Hero>
                 <HeroTop>
-                  <Breadcrumb aria-label="Breadcrumb">
-                    <CrumbButton onClick={handleBackToCategories}>
-                      All categories
-                    </CrumbButton>
-                    <span aria-hidden="true">/</span>
-                    <CrumbCurrent>{selectedCategory.label}</CrumbCurrent>
-                  </Breadcrumb>
+                  {/* Back to the category grid (the Design Selection landing). */}
+                  <GhostButton onClick={handleBackToCategories} title="Back to all categories">
+                    <FaArrowLeft size={13} /> Back
+                  </GhostButton>
 
                   {/* Per-category search — committed value is forwarded into the
                       getThemes API payload by ThemeBrowser. */}
@@ -910,6 +1029,13 @@ const DesignSelectionPage = () => {
                     )}
                   </ThemeSearch>
                 </HeroTop>
+                <Breadcrumb aria-label="Breadcrumb">
+                  <CrumbButton onClick={handleBackToCategories}>
+                    All categories
+                  </CrumbButton>
+                  <span aria-hidden="true">/</span>
+                  <CrumbCurrent>{selectedCategory.label}</CrumbCurrent>
+                </Breadcrumb>
                 <Heading>{selectedCategory.label} projects</Heading>
                 <SubHeading>
                   Pick a ready-made design to start, or use{" "}
@@ -927,6 +1053,7 @@ const DesignSelectionPage = () => {
                 onClearSearch={clearThemeSearch}
                 downloadSupported={downloadSupported}
                 downloadedIds={downloadedIds}
+                partialIds={partialIds}
                 downloadingId={downloadingId}
                 onDownloadTheme={handleDownloadTheme}
                 showBlankCard={isSpreadCategory && !themeSearch}

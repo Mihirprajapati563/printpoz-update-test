@@ -147,9 +147,12 @@ export const deleteThemePack = async (themeId) => {
 };
 
 /**
- * Rebuild the original-url → app-assets-url map from every complete pack and
- * push it into imageCache. Call at boot and after any download/delete so the
- * canvas resolves a downloaded theme's assets from disk immediately.
+ * Rebuild the original-url → app-assets-url map from every pack — PARTIAL packs
+ * included — and push it into imageCache. Call at boot and after any download/
+ * delete so the canvas resolves a downloaded theme's assets from disk
+ * immediately. Partial packs belong in the map: the manifest only lists files
+ * actually written, so every mapped url resolves, and an interrupted download's
+ * assets must keep rendering offline while it waits to resume.
  */
 export const refreshThemePackUrlMap = async () => {
   const a = api();

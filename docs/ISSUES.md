@@ -27,7 +27,7 @@ This document lists every production risk identified in the branch diff, with ro
 **Category:** Security
 
 ### Root cause
-`CLIENT_SECRET = "GOCSPX-REDACTED"` is a string constant in the bundled JavaScript. Any user can extract it via DevTools → Sources, or via a download of the bundle.
+`CLIENT_SECRET = "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"` is a string constant in the bundled JavaScript. Any user can extract it via DevTools → Sources, or via a download of the bundle.
 
 ### Impact
 - Violates OAuth 2.0 spec (Section 2.1 — confidential clients only).

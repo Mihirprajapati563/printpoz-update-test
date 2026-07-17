@@ -5158,6 +5158,18 @@ export const canvasSlice = createSlice({
         state.pages[state.activePageIndex].layout[state.activeSide] =
           newPayload;
       }
+      // A layout side can exist WITHOUT a background object (freshly-created
+      // themes generate `{ width, height, objects, safeAreaObjects }` with no
+      // `background`), so the guard above — which only rebuilds a MISSING side —
+      // won't help. Ensure the background exists before writing to it, mirroring
+      // the spread setters (setBackgroundColorSpread et al.).
+      if (!state.pages[state.activePageIndex].layout[state.activeSide].background) {
+        state.pages[state.activePageIndex].layout[state.activeSide].background = {
+          color: null,
+          image: null,
+          flip: false,
+        };
+      }
       state.pages[state.activePageIndex].layout[
         state.activeSide
       ].background.color = action.payload;
@@ -5193,6 +5205,15 @@ export const canvasSlice = createSlice({
         state.pages[state.activePageIndex].layout[state.activeSide] =
           newPayload;
       }
+      // Ensure the background exists — a layout side may have none (see
+      // setBackgroundColor for the full rationale).
+      if (!state.pages[state.activePageIndex].layout[state.activeSide].background) {
+        state.pages[state.activePageIndex].layout[state.activeSide].background = {
+          color: null,
+          image: null,
+          flip: false,
+        };
+      }
       state.pages[state.activePageIndex].layout[
         state.activeSide
       ].background.gradient = action.payload;
@@ -5222,6 +5243,16 @@ export const canvasSlice = createSlice({
         state.pages[state.activePageIndex].layout[state.activeSide] =
           newPayload;
       }
+      // Ensure the background exists — a layout side may have none (see
+      // setBackgroundColor for the full rationale). This setter's newPayload
+      // above also omits `background`, so this guard covers that case too.
+      if (!state.pages[state.activePageIndex].layout[state.activeSide].background) {
+        state.pages[state.activePageIndex].layout[state.activeSide].background = {
+          color: null,
+          image: null,
+          flip: false,
+        };
+      }
       state.pages[state.activePageIndex].layout[
         state.activeSide
       ].background.flip = action.payload;
@@ -5249,6 +5280,17 @@ export const canvasSlice = createSlice({
         };
         state.pages[state.activePageIndex].layout[state.activeSide] =
           newPayload;
+      }
+      // Ensure the background exists — a layout side may have none (see
+      // setBackgroundColor for the full rationale). This is the reducer that was
+      // crashing ("Cannot set properties of undefined (setting 'image')") when
+      // applying a background image to a freshly-created theme.
+      if (!state.pages[state.activePageIndex].layout[state.activeSide].background) {
+        state.pages[state.activePageIndex].layout[state.activeSide].background = {
+          color: null,
+          image: null,
+          flip: false,
+        };
       }
       let backgroundPayload = action.payload;
       let url = backgroundPayload.urls.find(

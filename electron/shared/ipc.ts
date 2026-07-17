@@ -26,6 +26,7 @@ export const CHANNELS = {
   // on-disk font cache (avoid re-downloading the same WOFF2 every session)
   fontsCacheGet: "fonts:cacheGet",
   fontsCachePut: "fonts:cachePut",
+  fontsCacheHas: "fonts:cacheHas",
   // offline-first catalog cache for library assets (layouts/backgrounds/
   // stickers/masks/themes listing JSON) — read on offline, write-through online
   assetsCacheGet: "assetsCache:get",
@@ -305,8 +306,12 @@ export interface ThemePackMeta {
   thumbnail: string | null; // LOCAL app-assets:// url of the card thumbnail
   sizesCount: number;
   downloadedAt: number;
-  totalBytes: number;
+  totalBytes: number; // recomputed from the bytes actually on disk by the service
   complete: boolean; // false while a download is partial/resumable
+  // How many asset urls the server has permanently lost (404/410). These do NOT
+  // block `complete` — a theme with one dead CDN url must still be able to
+  // finish — but the count is surfaced so the gap isn't silent.
+  missingCount: number;
 }
 
 // Full per-pack manifest (manifest.json) — meta + the url→file map + variants.
@@ -315,9 +320,20 @@ export interface ThemePackManifest extends ThemePackMeta {
   assets: ThemePackAsset[];
   fontUrls: string[];
   thumbnailUrl: string | null; // ORIGINAL url chosen as the thumbnail
+  missing: string[]; // permanently-gone asset urls (see missingCount)
 }
 
-// Payload the renderer sends to persist a pack (after all bytes are written).
+// Payload the renderer sends to CHECKPOINT a pack. This is not necessarily a
+// finished download: the renderer persists after every batch of assets and on
+// abort, so an interrupted download keeps its bytes and stays resumable.
+//
+// The write is ADDITIVE — the service unions `assets`/`missing` into whatever the
+// previous run recorded (see themePacksSaveManifest). So a resumed run may send
+// only the assets IT saw without truncating the pack.
+//
+// Deliberately NO `totalBytes`: the service stats the files on disk instead. A
+// renderer-supplied total is wrong on every resume (it only counts this run's
+// transfer) and would make the pack appear to shrink.
 export interface SaveThemePackInput {
   themeId: string;
   name: string;
@@ -326,11 +342,11 @@ export interface SaveThemePackInput {
   fingerprint: string | null;
   sizes: ThemePackSize[];
   assets: ThemePackAsset[];
+  missing: string[]; // urls the server permanently lost (404/410)
   fontUrls: string[];
   thumbnailUrl: string | null;
   downloadedAt: number;
-  totalBytes: number;
-  complete: boolean;
+  complete: boolean; // MUST be explicit — see isSaveInput; omitting it would mark a partial pack complete
   themeJson: string; // raw getTheme response (stringified) — the offline-open source
 }
 
@@ -341,7 +357,9 @@ export interface ThemePacksApi {
   putAsset(themeId: string, file: string, bytes: ArrayBuffer): Promise<void>;
   saveManifest(input: SaveThemePackInput): Promise<void>;
   delete(themeId: string): Promise<void>;
-  // originalUrl → app-assets:// url, across every complete pack (one boot call).
+  // originalUrl → app-assets:// url, across every pack (one boot call). PARTIAL
+  // packs are deliberately included — a half-downloaded pack's assets must still
+  // resolve from disk, which is the whole point of keeping them.
   urlMap(): Promise<Record<string, string>>;
 }
 
@@ -439,12 +457,17 @@ export interface DesktopApi {
     cacheGet(url: string): Promise<ArrayBuffer | null>;
     // Stores font bytes on disk keyed by the source URL.
     cachePut(url: string, bytes: ArrayBuffer): Promise<void>;
+    // True if this url's bytes are already on disk. A boolean probe, so a
+    // resuming theme download can skip warmed fonts without shipping the whole
+    // font file over the bridge just to discover it already has it.
+    cacheHas(url: string): Promise<boolean>;
   };
   editorData: EditorDataApi;
   assetsCache: AssetsCacheApi;
   imageCache: ImageCacheApi;
   themePacks: ThemePacksApi;
-  checkForUpdate(): Promise<void>;
   onMenu(cb: (event: MenuEvent) => void): () => void;
+  /** Re-run the update check on demand (the banner's Retry button). */
+  checkForUpdate(): Promise<void>;
   onUpdateStatus(cb: (status: UpdateStatus, progress?: number) => void): () => void;
 }

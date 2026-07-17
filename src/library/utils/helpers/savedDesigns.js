@@ -593,6 +593,49 @@ export const removeSavedDesign = async (id) => {
   }
 };
 
+/**
+ * Update ONLY a design's thumbnail, preserving everything else — most
+ * importantly its createdAt/updatedAt (so the card keeps its date and list
+ * position) and its heavy payload. Used by the one-time thumbnail regeneration
+ * (regenerateThumbnails.js) to refresh pre-existing cards without re-dating them.
+ * Resolves true on success.
+ */
+export const updateSavedDesignThumbnail = async (id, thumbnail) => {
+  if (!id || !thumbnail) return false;
+  try {
+    // ── Desktop ────────────────────────────────────────────────────
+    // designsGet returns the FULL entry (payload + meta); write it straight
+    // back with only the thumbnail changed. designsPut preserves createdAt/
+    // updatedAt when present, and the list is re-sorted by updatedAt on read,
+    // so the card's date and order are unchanged.
+    const api = desktopApi();
+    if (api) {
+      const entry = await api.designsGet(id).catch(() => null);
+      if (!entry) return false;
+      await api.designsPut({ ...entry, thumbnail });
+      return true;
+    }
+
+    // ── Web: localStorage fallback ────────────────────────────────
+    if (!idbAvailable()) {
+      const lib = readLegacyLibrary();
+      const d = lib.designs.find((x) => x.id === id);
+      if (!d) return false;
+      d.thumbnail = thumbnail;
+      return writeLegacyLibrary(lib);
+    }
+
+    // ── Web: IndexedDB — patch only the meta store's thumbnail ────
+    await ensureMigrated();
+    const meta = await idbGet(META_STORE, id).catch(() => null);
+    if (!meta) return false;
+    await idbPutAcross([{ store: META_STORE, value: { ...meta, thumbnail } }]);
+    return true;
+  } catch (_) {
+    return false;
+  }
+};
+
 /** True if the library has at least one saved design. */
 export const hasSavedDesigns = async () => {
   try {

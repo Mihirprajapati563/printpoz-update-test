@@ -559,7 +559,23 @@ const useSetupTheme = () => {
               }
               dispatch(setCalendarSettings(calSettings));
             }
-            dispatch(setSettings(themeData.theme[0].settings));
+            // Reset spread/cover flags before merging the theme's settings so a
+            // stale settings.isFoldable / cover flag from a previously opened
+            // photobook/layflat/foldable theme can't leak into this one and render
+            // a non-spread product as a fold spread (see the matching reset on the
+            // URL/admin load path below for the full rationale).
+            dispatch(
+              setSettings({
+                isFoldable: false,
+                coverEnabled: false,
+                showFullCoverSheet: false,
+                hideLastCover: false,
+                exportSpine: false,
+                spineWidth: 0,
+                paperThickness: 0,
+                ...(themeData.theme[0].settings || {}),
+              })
+            );
             //  setupTheme();
 
             // set new size of canvas  only if user is customer
@@ -810,7 +826,27 @@ const useSetupTheme = () => {
       }
       dispatch(setCalendarSettings(calSettings));
     }
-    dispatch(setSettings(themeData.theme[0].settings));
+    // Reset spread/cover flags to their initialState defaults BEFORE merging the
+    // theme's own settings. Desktop's Redux store is long-lived (SPA), so flags
+    // from a previously opened photobook/layflat/foldable theme — especially
+    // settings.isFoldable, which makes the canvas draw a center fold line and
+    // render a non-spread product (calendar/canvas/print/…) as a 2-up spread —
+    // would otherwise survive this merge. The web app avoids this for free by
+    // starting from a fresh initialState on every page load. The theme's saved
+    // settings below re-apply real cover flags for photobook/layflat, and
+    // setSettings re-forces isFoldable:true for LAYFLATALBUM.
+    dispatch(
+      setSettings({
+        isFoldable: false,
+        coverEnabled: false,
+        showFullCoverSheet: false,
+        hideLastCover: false,
+        exportSpine: false,
+        spineWidth: 0,
+        paperThickness: 0,
+        ...(themeData.theme[0].settings || {}),
+      })
+    );
     dispatch(setThemeId(themeid));
     // A user-supplied project name (from the size modal) wins over the theme's own
     // name, so "Your Designs" shows what the user typed. Falls back to the theme
