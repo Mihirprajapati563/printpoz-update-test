@@ -516,20 +516,15 @@ const PlaceHolder = (item) => {
 const PhotoHolder = ({ item, isDragging, imageTransform, size }) => {
   let imgUrl = item.url ? item?.url : "/images/dropimgtext.svg";
   if (Array.isArray(item.urls) && item.urls.length) {
-    // Caller picks the variant: the 3D product previews ask for `large` (they are
-    // shown big — a downscaled variant looked blurry), the footer thumbnails ask
-    // for `small` (tiny on screen; loading `large` for every page would decode a
-    // pile of full-res files). Default `small` when unspecified.
+    // Footer/preview thumbnails use the lightweight `small` variant on both web
+    // and desktop (tiny on screen; loading `large` for every page would decode a
+    // pile of full-res files). The main editing canvas uses `large` separately.
     const want = ["large", "medium", "small"].includes(size) ? size : "small";
     // Fall back through the available variants — desktop REFERENCE-mode photos
     // carry only `small` + `large` (no `medium`), so a bare `medium` lookup used
-    // to return nothing and the preview rendered BLANK. Never empty, and never
-    // fall FROM `large` straight to `small`: step down one rung at a time so a
-    // missing `medium` can't silently turn a high-res preview into a thumbnail.
-    const order =
-      want === "large"
-        ? ["large", "medium", "small"]
-        : [want, "small", "medium", "large"];
+    // to return nothing and the preview rendered BLANK. Prefer the requested size,
+    // then light→heavy so previews stay cheap but never empty.
+    const order = [want, "small", "medium", "large"];
     let picked = null;
     for (const s of order) {
       const m = item.urls.find((img) => img && img.size === s && img.url);

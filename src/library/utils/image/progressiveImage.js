@@ -7,13 +7,9 @@ import { isDesktop } from "../../../desktop";
  * Loading ladder per canvas image:
  *   1. small  → painted IMMEDIATELY (tens of KB, decodes in ms) for instant content.
  *   2. medium → swapped in once decoded off-thread (clean sharpen, no flash).
- *   3. large  → ALWAYS upgraded to after medium, so every canvas image settles at
- *               full resolution. The ladder only controls how fast the first pixels
- *               appear — the END STATE is always `large`.
- *
- * The intermediate rungs are a first-paint optimisation ONLY; the canvas must never
- * REST on a downscaled variant (that read as "blurry in canvas"). Product decision
- * 2026-07-16: canvas + 3D preview show `large`; footer + sidebar stay on `small`.
+ *   3. large  → upgraded to AFTER medium, so the on-screen image reaches full
+ *               resolution. This happens immediately for the SELECTED image
+ *               (you're focused on it) and on idle for the rest of the page.
  *
  * Why this is safe at 500–2000 photos: the canvas only mounts the ACTIVE page,
  * so the large-upgrade naturally scopes to just the visible spread — navigate
@@ -60,6 +56,10 @@ function isLocalUrl(url) {
     (url.startsWith("blob:") || url.startsWith("data:") || url.startsWith("app-assets:"))
   );
 }
+
+// Desktop display order: local files load instantly from disk, so there is no
+// bandwidth ladder — always prefer the largest (sharpest) variant.
+export const DESKTOP_DISPLAY_ORDER = ["large", "medium", "small"];
 
 function loadAndDecode(url) {
   return new Promise((resolve, reject) => {
@@ -224,32 +224,46 @@ function scheduleIdleSwap(fn) {
 }
 
 /**
- * useProgressiveImage(item)
+ * useProgressiveImage(item, isActive, isInteracting)
  *
- * Loading ladder: small → medium → large. ALWAYS ends at `large` — the rungs only
- * make the first paint fast, they are never the resting state.
+ * Loading ladder: small → medium (always) → large (the SELECTED image only,
+ * and only once the user has STOPPED manipulating it).
  *
  * NO variant swapping during interaction. Zoom is applied on the canvas as a GPU
  * `transform: scale()` (see Photo.jsx) — the bitmap is decoded ONCE and the GPU
  * samples the existing texture, so zoom never re-rasterizes and `large` is smooth
- * at any zoom. The ladder climbs small → medium → large once and stays there.
+ * at any zoom. Because we no longer need to drop to `medium` mid-zoom, we also no
+ * longer swap the `<img src>` mid-gesture — which was the zoom "blink". The ladder
+ * simply climbs small → medium → large once and stays there.
  *
- * ponytail: every placed photo on the active spread now decodes at full res
- * (~96 MB per 6000×4000 image; a 20-photo spread can transient-peak near 2 GB and
- * lag on weak machines). This is the explicit product requirement — the canvas must
- * show the true high-res image. If that peak ever bites, the knob is `LARGE_ORDER`
- * vs a zoom-gated upgrade, NOT a silent downgrade of the resting variant.
+ * `large` is downloaded only for the SELECTED image (bounded memory/network); once
+ * decoded it is shown for any image, even after deselect (no pointless downgrade).
+ * Non-selected, never-selected images stay at `medium`. Print/export always uses
+ * large/original server-side regardless.
  *
  * Returns the <img src> to use. Never blanks, never swaps mid-gesture.
  */
-export function useProgressiveImage(item) {
+export function useProgressiveImage(item, wantLarge = false) {
   const placeholderUrl = pickVariantUrl(item, PLACEHOLDER_ORDER);
   const mediumUrl = pickVariantUrl(item, MEDIUM_ORDER);
   const largeUrl = pickVariantUrl(item, LARGE_ORDER);
 
-  // ── Desktop: local files load instantly from disk (no bandwidth ladder, no
-  // decode/preload/idle staging needed) — pick the sharpest variant SYNCHRONOUSLY.
-  const desktopUrl = isDesktop ? largeUrl || mediumUrl || placeholderUrl : "";
+  // ── Desktop: local files load instantly from disk, so no decode/preload/idle
+  // ladder is needed — pick the variant SYNCHRONOUSLY. But still gate on zoom:
+  // showing the full-res `large` for EVERY placed image at once decodes ~96 MB
+  // per 6000×4000 photo (≈2 GB for a 20-image spread) → the interaction lag.
+  // At cover-fit `medium` (50%, still 3000×2000) is sharper than the screen can
+  // show; `large` upgrades only when the user zooms INTO an image (wantLarge).
+  // Reference-mode assets (desktop device imports) carry ONLY small + large,
+  // where `large` is the FULL ORIGINAL file. `mediumUrl` would then fall through
+  // to that original, decoding full-res for EVERY placed photo in a spread (the
+  // ~2 GB hazard above). So for the non-zoom case pick medium→small explicitly
+  // (never the original); the full original loads only when the user zooms into
+  // an image (`wantLarge`). Copy-mode assets still have a real medium, unchanged.
+  const desktopNonZoomUrl = pickVariantUrl(item, ["medium", "small"]);
+  const desktopUrl = isDesktop
+    ? (wantLarge ? largeUrl || mediumUrl : desktopNonZoomUrl || largeUrl) || placeholderUrl
+    : "";
 
   const [src, setSrc] = useState(() =>
     isDesktop ? desktopUrl : bestCachedSrc(largeUrl, mediumUrl, placeholderUrl)
@@ -294,10 +308,14 @@ export function useProgressiveImage(item) {
         showIdle(mediumUrl); // fresh decode → upgrade on idle (don't block edits)
       }
 
-      // ── Stage 2: large (full resolution) — ALWAYS. The canvas must settle at the
-      // true high-res image; `medium` is a first-paint rung only, never the resting
-      // state (resting on it read as "blurry in canvas"). The upgrade still lands on
-      // idle (showIdle), so it yields to any in-progress edit/gesture.
+      // ── Stage 2: large (full resolution) — ONLY when the image is zoomed in
+      // past cover-fit (wantLarge). At normal/cover-fit view `medium` is already
+      // sharper than the screen can show, so selecting an image must NOT pull a 4K
+      // variant — that download+decode was the bulk of the image lag (the DevTools
+      // "282 MB wasteful" + the select→move hitch). `large` loads only when the
+      // user actually zooms INTO an image; print/export use large/original
+      // server-side regardless, so this never affects output quality.
+      if (!wantLarge) return;
       if (!largeUrl || largeUrl === mediumUrl || isLocalUrl(largeUrl)) return;
       if (decodedFull.has(largeUrl)) {
         show(largeUrl); // already decoded → cheap src swap, show immediately
@@ -318,7 +336,7 @@ export function useProgressiveImage(item) {
       pendingCancels.forEach((c) => c && c());
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mediumUrl, largeUrl, placeholderUrl]);
+  }, [mediumUrl, largeUrl, placeholderUrl, wantLarge]);
 
   return src;
 }

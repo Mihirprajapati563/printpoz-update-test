@@ -424,7 +424,7 @@ export const FoldingLayoutPreviewPages = ({
                           <Photo
                             item={item}
                             zoomRatio={zoomRatio}
-                            size={"large"}
+                            size={"medium"}
                             showPlaceholder={false}
                           />
                         )}
@@ -504,7 +504,7 @@ export const FoldingLayoutPreviewPages = ({
                                 {item.type === "img" && (
                                   <Photo
                                     item={item}
-                                    size={"large"}
+                                    size={"medium"}
                                     zoomRatio={zoomRatio}
                                     showPlaceholder={false}
                                   />

@@ -996,20 +996,24 @@ const PhotoHolder = ({ item, isDragging, imageTransform, isActive }) => {
   const showUploadFailedBadge =
     pendingUploadStatus === "failed" || pendingUploadStatus === "missing";
 
-  // Progressive display ladder: paint cached/`small` → `medium` baseline → `large`
-  // ALWAYS (the rungs are first-paint only; the canvas rests at full res). Live URLs
-  // in Redux (item.url / item.urls) are untouched, so save/order/export always emit
-  // the live URL. Optimistic-upload previews (blob:) pass straight through.
-  const displaySrc = useProgressiveImage(item);
-
-  // Is the inner image zoomed IN past cover-fit? Drives the GPU-layer hint below
-  // ONLY (it no longer gates the variant — the canvas always settles at `large`).
-  // `cover-fit` = the minimum scale that fills the frame.
+  // Only fetch the full-res `large` variant when the inner image is zoomed IN past
+  // cover-fit — at cover-fit (place/move, the common case) `medium` is already
+  // sharper than the screen, so selecting an image no longer pulls a 4K bitmap
+  // (that download+decode was the bulk of the image lag). `large` loads when the
+  // user zooms into the image; print/export always use large/original server-side,
+  // so output quality is unaffected. `cover-fit` = the minimum scale that fills the
+  // frame; scale meaningfully above it ⇒ the crop is magnified ⇒ medium would soften.
   const coverScale = Math.max(
     (item.width || 1) / (item.image?.width || 1),
     (item.height || 1) / (item.image?.height || 1)
   );
-  const isZoomedIn = (item.image?.scale || coverScale) > coverScale * 1.5;
+  const wantLarge = (item.image?.scale || coverScale) > coverScale * 1.5;
+
+  // Progressive display ladder: paint cached/`small` → `medium` baseline → `large`
+  // only when zoomed in (wantLarge). Live URLs in Redux (item.url / item.urls) are
+  // untouched, so save/order/export always emit the live URL. Optimistic-upload
+  // previews (blob:) pass straight through.
+  const displaySrc = useProgressiveImage(item, wantLarge);
 
   // Loading skeleton: show a shimmer over the box until the image first paints
   // (e.g. after a page refresh, while the bitmap downloads). `loaded` LATCHES true
@@ -1114,10 +1118,10 @@ const PhotoHolder = ({ item, isDragging, imageTransform, isActive }) => {
           transform: `translate(${item.image?.positionX || 0}px, ${item.image?.positionY || 0}px) scale(${parseFloat((item.image?.scale ?? 1).toFixed(4))})`,
           transformOrigin: "0 0",
           // Promote to a GPU compositing layer ONLY while actually panning
-          // (isDragging) or zoomed in (isZoomedIn) — NOT on mere selection. Layering
+          // (isDragging) or zoomed in (wantLarge) — NOT on mere selection. Layering
           // a full-res image on every select cost a `Layerize` pass per selection
           // (seen in the profiles); cover-fit selected images don't need a layer.
-          willChange: isZoomedIn || isDragging ? "transform" : "auto",
+          willChange: wantLarge || isDragging ? "transform" : "auto",
         }}
       // loadingPlaceholder={<ImageLoader2 />}
       // loader={<ImageLoader />}
