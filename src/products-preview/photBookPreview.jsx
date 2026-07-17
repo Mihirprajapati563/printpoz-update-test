@@ -180,7 +180,7 @@ export const PhobookPreview = ({ show, handleClose }) => {
                                         <Photo
                                           item={item}
                                           zoomRatio={zoomRatio}
-                                          size={"medium"}
+                                          size={"large"}
                                         />
                                       )}
                                       {item.type === "sticker" && (

@@ -443,7 +443,7 @@ const Page = ({ activePage, sortedObjects, index, key, totalPages }) => {
                                     <Photo
                                       item={item}
                                       zoomRatio={zoomRatio}
-                                      size={"medium"}
+                                      size={"large"}
                                       showPlaceholder={false}
                                     />
                                   )}
@@ -549,7 +549,7 @@ const Page = ({ activePage, sortedObjects, index, key, totalPages }) => {
                                       <Photo
                                         item={item}
                                         zoomRatio={zoomRatio}
-                                        size={"medium"}
+                                        size={"large"}
                                         showPlaceholder={false}
                                       />
                                     )}

@@ -629,7 +629,7 @@ export const PhotoBookPreviewPages = ({
                           <Photo
                             item={item}
                             zoomRatio={zoomRatio}
-                            size="medium"
+                            size="large"
                             showPlaceholder={false}
                           />
                         )}
@@ -715,7 +715,7 @@ export const PhotoBookPreviewPages = ({
                                 {item.type === "img" && (
                                   <Photo
                                     item={item}
-                                    size={"medium"}
+                                    size={"large"}
                                     zoomRatio={zoomRatio}
                                     showPlaceholder={false}
                                   />
